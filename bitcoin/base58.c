@@ -122,22 +122,6 @@ char *key_to_base58(const tal_t *ctx, bool test_net, const struct privkey *key)
 	return tal_strdup(ctx, out);
 }
 
-void secret_to_base58( char * output, bool test_net, const struct privkey *key)
-{
-	u8 buf[32 + 1];
-	char out[BASE58_KEY_MAX_LEN + 2];
-	u8 version = test_net ? 239 : 128;
-	size_t outlen = sizeof(out);
-    b58_sha256_impl = my_sha256; //to use libbase58 for base58check, we must provide a SHA256 function.
-
-	memcpy(buf, key->secret, sizeof(key->secret));
-	/* Mark this as a compressed key. */
-	buf[32] = 1;
-
-	b58check_enc(out, &outlen, version, buf, sizeof(buf));
-    memcpy(output, out, outlen);
-}
-
 bool key_from_base58(const char *base58, size_t base58_len,
 		     bool *test_net, struct privkey *priv, struct pubkey *key)
 {

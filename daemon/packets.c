@@ -269,7 +269,6 @@ void queue_pkt_close_shutdown(struct peer *peer)
 					   tal_count(peer->closing.our_script),
 					   0);
 	c->scriptpubkey.len = tal_count(c->scriptpubkey.data);
-//	bitcoind_importprivkey(peer->dstate,&(peer->secrets->final)->secret,NULL,false);
 	queue_pkt(peer, PKT__PKT_CLOSE_SHUTDOWN, c);
 }
 
