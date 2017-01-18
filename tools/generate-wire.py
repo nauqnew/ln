@@ -174,6 +174,7 @@ class Message(object):
                     raise ValueError('Field {} has non-simple length variable {}'
                                      .format(field.name, field.lenvar))
                 f.is_len_var = True;
+                f.lenvar_for = field
                 return
         raise ValueError('Field {} unknown length variable {}'
                          .format(field.name, field.lenvar))
@@ -277,7 +278,7 @@ class Message(object):
               .format(self.name), end='')
 
         for f in self.fields:
-            if f.is_padding():
+            if f.is_padding() or f.is_len_var:
                 continue
             if f.is_array():
                 print(', const {} {}[{}]'.format(f.fieldtype.name, f.name, f.num_elems), end='')
@@ -291,8 +292,13 @@ class Message(object):
             return
 
         print(')\n'
-              '{{\n'
-              '\tu8 *p = tal_arr(ctx, u8, 0);\n'
+              '{\n')
+        for f in self.fields:
+            if f.is_len_var:
+                print('\t{0} {1} = {2} ? tal_count({2}) : 0;'
+                      .format(f.fieldtype.name, f.name, f.lenvar_for.name));
+
+        print('\tu8 *p = tal_arr(ctx, u8, 0);\n'
               ''
               '\ttowire_u16(&p, {});'.format(self.enum.name))
 
@@ -339,6 +345,7 @@ else:
     print('#include <{}>\n'
           '#include <ccan/mem/mem.h>\n'
           '#include <ccan/tal/str/str.h>\n'
+          '#include <stdio.h>\n'
           ''.format(options.headerfilename))
 
 # Maps message names to messages
@@ -397,11 +404,15 @@ if options.header:
 else:
     print('const char *{}_name(int e)'.format(options.enumname))
     print('{{\n'
+          '\tstatic char invalidbuf[sizeof("INVALID ") + STR_MAX_CHARS(e)];\n'
+          '\n'
           '\tswitch ((enum {})e) {{'.format(options.enumname));
     for m in messages:
         print('\tcase {0}: return "{0}";'.format(m.enum.name))
     print('\t}\n'
-          '\treturn tal_fmt(NULL, "**INVALID** %i", e);\n'
+          '\n'
+          '\tsprintf(invalidbuf, "INVALID %i", e);\n'
+          '\treturn invalidbuf;\n'
           '}\n'
           '')
 

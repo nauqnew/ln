@@ -4,15 +4,20 @@
 wire-wrongdir:
 	$(MAKE) -C .. wire-all
 
-WIRE_HEADERS := wire/wire.h
+WIRE_HEADERS := wire/wire.h			\
+		wire/wire_sync.h		\
+		wire/wire_io.h
 WIRE_GEN_HEADERS := wire/gen_peer_wire.h wire/gen_onion_wire.h
 WIRE_GEN_SRC := wire/gen_peer_wire.c
 WIRE_GEN_ONION_SRC := wire/gen_onion_wire.c
-WIRE_SRC := wire/fromwire.c	\
+WIRE_SRC := wire/wire_sync.c			\
+		wire/wire_io.c			\
+		wire/fromwire.c			\
 		wire/towire.c
 
 WIRE_OBJS := $(WIRE_SRC:.c=.o) $(WIRE_GEN_SRC:.c=.o)
 WIRE_ONION_OBJS := $(WIRE_GEN_ONION_SRC:.c=.o)
+$(WIRE_OBJS): $(CCAN_HEADERS)
 
 # They may not have the bolts.
 BOLT_EXTRACT=$(BOLTDIR)/tools/extract-formats.py
@@ -46,9 +51,14 @@ check-whitespace: $(WIRE_SRC:%=check-whitespace/%) $(WIRE_HEADERS:%=check-whites
 
 clean: wire-clean
 
-wire-all: wire/gen_peer_wire.o wire/gen_onion_wire.o wire/fromwire.o wire/towire.o
+maintainer-clean: wire-maintainer-clean
+
+wire-maintainer-clean:
+	$(RM) wire/gen_*_csv
+
+wire-all: $(WIRE_OBJS) $(WIRE_ONION_OBJS)
 
 wire-clean:
-	$(RM) $(WIRE_OBJS) $(WIRE_GEN_SRC) $(WIRE_GEN_HEADERS) towire.c fromwire.c
+	$(RM) $(WIRE_OBJS) $(WIRE_ONION_OBJS) $(WIRE_GEN_SRC) $(WIRE_GEN_HEADERS)
 
 include wire/test/Makefile

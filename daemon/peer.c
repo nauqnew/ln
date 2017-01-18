@@ -887,7 +887,8 @@ static void their_htlc_added(struct peer *peer, struct htlc *htlc,
 	packet = parse_onionpacket(peer,
 				   htlc->routing, tal_count(htlc->routing));
 	if (packet)
-		step = process_onionpacket(packet, packet, &pk);
+		step = process_onionpacket(packet, packet, &pk, htlc->rhash.u.u8,
+					   sizeof(htlc->rhash));
 
 	if (!step) {
 		log_unusual(peer->log, "Bad onion, failing HTLC %"PRIu64,
@@ -2969,7 +2970,7 @@ static struct io_plan *peer_connected_out(struct io_conn *conn,
 	struct log *l;
 	struct netaddr addr;
 
-	l = new_log(conn, dstate->log_record, "OUT-%s:%s:",
+	l = new_log(conn, dstate->log_book, "OUT-%s:%s:",
 		    connect->name, connect->port);
 
 	if (!netaddr_from_fd(io_conn_fd(conn), SOCK_STREAM, IPPROTO_TCP, &addr)) {
@@ -3029,7 +3030,7 @@ static struct io_plan *peer_connected_in(struct io_conn *conn,
 	if (!netaddr_from_fd(io_conn_fd(conn), SOCK_STREAM, IPPROTO_TCP, &addr))
 		return false;
 	name = netaddr_name(conn, &addr);
-	l = new_log(conn, dstate->log_record, "IN-%s:", name);
+	l = new_log(conn, dstate->log_book, "IN-%s:", name);
 
 	log_debug(l, "Connected in");
 
@@ -4730,10 +4731,8 @@ static void json_newhtlc(struct command *cmd,
 	hoppayloads = tal_arrz(cmd, struct hoppayload, 1);
 	memcpy(&path[0], peer->id, sizeof(struct pubkey));
 	randombytes_buf(&sessionkey, sizeof(sessionkey));
-	packet = create_onionpacket(
-		cmd,
-		path,
-		hoppayloads, sessionkey, (u8*)"", 0);
+	packet = create_onionpacket(cmd, path, hoppayloads, sessionkey,
+				    rhash.u.u8, sizeof(rhash));
 	onion = serialize_onionpacket(cmd, packet);
 
 	log_debug(peer->log, "JSON command to add new HTLC");
@@ -5156,8 +5155,7 @@ static void json_signcommit(struct command *cmd,
 		= tal_free(peer->local.commit->tx->input[0].witness);
 
 	json_object_start(response, NULL);
-	json_add_string(response, "tx",
-			tal_hexstr(cmd, linear, tal_count(linear)));
+	json_add_string(response, "tx", tal_hex(cmd, linear));
 	json_object_end(response);
 	command_success(cmd, response);
 }

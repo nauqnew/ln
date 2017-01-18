@@ -774,7 +774,7 @@ static const char *linearize_shachain(const tal_t *ctx,
 	}
 
 	assert(tal_count(p) == SHACHAIN_SIZE);
-	str = tal_hexstr(ctx, p, tal_count(p));
+	str = tal_hex(ctx, p);
 	tal_free(p);
 	return str;
 }
@@ -968,7 +968,7 @@ static void db_load_peers(struct lightningd_state *dstate)
 			      sqlite3_column_str(stmt, 1));
 		pubkey_from_sql(stmt, 0, &id);
 		idstr = pubkey_to_hexstr(dstate, &id);
-		l = new_log(dstate, dstate->log_record, "%s:", idstr);
+		l = new_log(dstate, dstate->log_book, "%s:", idstr);
 		tal_free(idstr);
 		peer = new_peer(dstate, l, state, sqlite3_column_int(stmt, 2));
 		peer->htlc_id_counter = 0;
@@ -1013,7 +1013,7 @@ static const char *pubkeys_to_hex(const tal_t *ctx, const struct pubkey *ids)
 	for (i = 0; i < tal_count(ids); i++)
 		pubkey_to_der(ders + i * PUBKEY_DER_LEN, &ids[i]);
 
-	return tal_hexstr(ctx, ders, tal_count(ders));
+	return tal_hex(ctx, ders);
 }
 static struct pubkey *pubkeys_from_arr(const tal_t *ctx,
 				       const void *blob, size_t len)
@@ -1732,7 +1732,7 @@ void db_new_htlc(struct peer *peer, const struct htlc *htlc)
 			htlc->msatoshi,
 			abs_locktime_to_blocks(&htlc->expiry),
 			tal_hexstr(ctx, &htlc->rhash, sizeof(htlc->rhash)),
-			tal_hexstr(ctx, htlc->routing, tal_count(htlc->routing)),
+			tal_hex(ctx, htlc->routing),
 			peerid,
 			htlc->src->id);
 	} else {
@@ -1745,7 +1745,7 @@ void db_new_htlc(struct peer *peer, const struct htlc *htlc)
 			htlc->msatoshi,
 			abs_locktime_to_blocks(&htlc->expiry),
 			tal_hexstr(ctx, &htlc->rhash, sizeof(htlc->rhash)),
-			tal_hexstr(ctx, htlc->routing, tal_count(htlc->routing)));
+			tal_hex(ctx, htlc->routing));
 	}
 
 	tal_free(ctx);
@@ -2208,8 +2208,7 @@ void db_set_our_closing_script(struct peer *peer)
 
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate, "UPDATE closing SET our_script=x'%s',shutdown_order=%"PRIu64" WHERE peer=x'%s';",
-		tal_hexstr(ctx, peer->closing.our_script,
-			   tal_count(peer->closing.our_script)),
+		tal_hex(ctx, peer->closing.our_script),
 		peer->closing.shutdown_order,
 		peerid);
 	tal_free(ctx);
@@ -2244,8 +2243,7 @@ void db_set_their_closing_script(struct peer *peer)
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate,
 		"UPDATE closing SET their_script=x'%s' WHERE peer=x'%s';",
-		tal_hexstr(ctx, peer->closing.their_script,
-			   tal_count(peer->closing.their_script)),
+		tal_hex(ctx, peer->closing.their_script),
 		peerid);
 	tal_free(ctx);
 }
@@ -2471,7 +2469,7 @@ void db_complete_pay_command(struct lightningd_state *dstate,
 	else
 		db_exec(__func__, dstate,
 			"UPDATE pay SET fail=x'%s', htlc_peer=NULL WHERE rhash=x'%s';",
-			tal_hexstr(ctx, htlc->fail, tal_count(htlc->fail)),
+			tal_hex(ctx, htlc->fail),
 			tal_hexstr(ctx, &htlc->rhash, sizeof(htlc->rhash)));
 
 	tal_free(ctx);
