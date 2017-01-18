@@ -98,4 +98,23 @@ void bitcoind_getrawblock_(struct lightningd_state *dstate,
 						  struct lightningd_state *, \
 						  struct bitcoin_block *), \
 			      (arg))
+
+void bitcoind_importprivkey_(struct lightningd_state *dstate,
+                char *privatekey,
+                char *label,
+                bool rescan,
+                void (*cb)(struct lightningd_state *dstate,
+				           void *arg),
+                void *arg);
+#define bitcoind_importprivkey(dstate,privatekey,label,rescan, cb, arg) \
+    bitcoind_importprivkey_((dstate),                            \
+               (privatekey),                                    \
+                (label),                                        \
+                (rescan),										\
+                typesafe_cb_preargs(void, void *,		\
+						  (cb), (arg),		\
+						  struct lightningd_state *), \
+                (arg))
+
+void do_nothing(struct lightningd_state *dstate, void *arg);
 #endif /* LIGHTNING_DAEMON_BITCOIND_H */

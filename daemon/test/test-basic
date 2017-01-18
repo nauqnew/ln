@@ -11,7 +11,7 @@ if [ x"$1" = x"manual-commit" ]; then
     shift
 fi
 
-parse_cmdline 2 "$@"
+parse_cmdline 2 "$@" --verbose  #wen
 setup_lightning 2
 
 if [ -n "$MANUALCOMMIT" ]; then
@@ -57,7 +57,7 @@ HTLC_AMOUNT=10000000
 
 EXPIRY=$(( $(blockheight) + 10))
 SECRET=1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd
-RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
+RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'` #25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98
 
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 

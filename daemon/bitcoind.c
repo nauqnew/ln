@@ -465,3 +465,33 @@ void bitcoind_getblockhash_(struct lightningd_state *dstate,
 	start_bitcoin_cli(dstate, NULL, process_getblockhash, false, cb, arg,
 			  "getblockhash", str, NULL);
 }
+
+//add bitcoin-cli importprivkey
+static void process_importprivkey(struct bitcoin_cli *bcli)
+{
+	void (*cb)(struct lightningd_state *dstate,
+		   void *arg) = bcli->cb;
+	
+	if (bcli->output_bytes != 0) {
+		fatal("%s: importptivkey failed '%.*s'",
+		      bcli_args(bcli), (int)bcli->output_bytes, bcli->output);
+	}
+	cb(bcli->dstate, bcli->cb_arg);
+
+}
+
+void bitcoind_importprivkey_(struct lightningd_state *dstate,
+                char *privatekey,
+                char *label,
+                bool rescan,
+                void (*cb)(struct lightningd_state *dstate,
+				          void *arg),
+                void *arg)
+
+{
+    start_bitcoin_cli(dstate, NULL, process_importprivkey, false, cb, arg,
+              "importprivkey", privatekey, label, rescan);
+}
+
+void do_nothing(struct lightningd_state *dstate, void *arg)
+{}

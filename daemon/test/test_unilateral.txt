@@ -1,0 +1,238 @@
+wen@ubuntu:~$ cd lightning/daemon/test
+wen@ubuntu:~/lightning/daemon/test$ . scripts/vars.sh
+wen@ubuntu:~/lightning/daemon/test$ . scripts/helpers.sh
+wen@ubuntu:~/lightning/daemon/test$ parse_cmdline 2 "$@" --verbose
+wen@ubuntu:~/lightning/daemon/test$ setup_lightning 2
+wen@ubuntu:~/lightning/daemon/test$ start_lightningd 2
+        { "type" : "INFO", "time" : "0.136292953", "source" : "lightningd(22329):", "log" : "Hello world!" },
+        { "type" : "INFO", "time" : "0.135494351", "source" : "lightningd(22334):", "log" : "Hello world!" },
+[
+  "16d6d4b934b19e38374d2d978c5e8be825d9560abb6826d2c37dd8e4796c6b91"
+]
+wen@ubuntu:~/lightning/daemon/test$ lcli1 connect localhost $PORT2 $FUND_INPUT_TX &
+[1] 22449
+wen@ubuntu:~/lightning/daemon/test$ ../lightning-cli --lightning-dir=/tmp/lightning.20356.1 connect localhost 4004 01000000013c49e7ff7becc5e211073c700db0390df17110fe8387cf30c3e17dfd077a5888010000006b483045022100c1b18395775f36058dc4e26b20000c502c04be20d3ae6397f80e890b57cbf275022016ceb9a038106713e9ddf1409550ae7f5ca04a2bf06042863f96fad6b2013018012103b1faa9336ea480b2ed21e8718646d704f9379399fafe39b1dd46be8234fe2976feffffff02b88a3109000000001976a914bb7dfe585f1784ec14d05f3a5645dd51d392c0d188ac40420f000000000017a914f5a78e0e9c07ddff4286f6386933690050b2864487bc030000
+
+wen@ubuntu:~/lightning/daemon/test$ check_tx_spend
+  "5e746f7f71c91baf4e15a684942a3f63d2afaffaf92aab307853a964c20643df"
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 1
+[
+  "5bdaad3c8f0010afbf75e894f64e0e64a374f9163b5bda27d606a8a0ada80145"
+]
+wen@ubuntu:~/lightning/daemon/test$ { "id" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44" }
+
+[1]+  Done                    lcli1 connect localhost $PORT2 $FUND_INPUT_TX
+wen@ubuntu:~/lightning/daemon/test$ DO_RECONNECT=$RECONNECT
+wen@ubuntu:~/lightning/daemon/test$ check_peerstate lcli1 STATE_NORMAL
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+        { "name" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44:", "state" : "STATE_NORMAL", "peerid" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44", "connected" : true, "our_amount" : 924280000, "our_fee" : 67600000, "their_amount" : 0, "their_fee" : 0, "our_htlcs" :
+wen@ubuntu:~/lightning/daemon/test$ check_peerstate lcli2 STATE_NORMAL
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 getpeers
+        { "name" : "031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f:", "state" : "STATE_NORMAL", "peerid" : "031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f", "connected" : true, "our_amount" : 0, "our_fee" : 0, "their_amount" : 924280000, "their_fee" : 67600000, "our_htlcs" :
+wen@ubuntu:~/lightning/daemon/test$ lcli2 dev-routefail false
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 dev-routefail false
+{  }
+wen@ubuntu:~/lightning/daemon/test$ A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE))
+wen@ubuntu:~/lightning/daemon/test$ A_FEE=$NO_HTLCS_FEE
+wen@ubuntu:~/lightning/daemon/test$ B_AMOUNT=0
+wen@ubuntu:~/lightning/daemon/test$ B_FEE=0
+wen@ubuntu:~/lightning/daemon/test$ echo $A_AMOUNT
+924280000
+wen@ubuntu:~/lightning/daemon/test$ echo $A_FEE
+67600000
+wen@ubuntu:~/lightning/daemon/test$ HTLC_AMOUNT=10000000
+wen@ubuntu:~/lightning/daemon/test$ EXPIRY=$(( $(blockheight) + 10))
+wen@ubuntu:~/lightning/daemon/test$ SECRET=1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd
+wen@ubuntu:~/lightning/daemon/test$ RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 dev-rhash 1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd
+wen@ubuntu:~/lightning/daemon/test$ HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 dev-newhtlc 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44 10000000 968 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98
+wen@ubuntu:~/lightning/daemon/test$ A_AMOUNT=$(($A_AMOUNT - $EXTRA_FEE - $HTLC_AMOUNT))
+wen@ubuntu:~/lightning/daemon/test$ echo $A_AMOUNT
+907880000
+wen@ubuntu:~/lightning/daemon/test$ echo $EXTRA_FEE
+6400000
+wen@ubuntu:~/lightning/daemon/test$ A_FEE=$(($A_FEE + $EXTRA_FEE))
+wen@ubuntu:~/lightning/daemon/test$ echo $A_FEE
+74000000
+wen@ubuntu:~/lightning/daemon/test$ B_AMOUNT=0
+wen@ubuntu:~/lightning/daemon/test$ B_FEE=0
+wen@ubuntu:~/lightning/daemon/test$ check_status $A_AMOUNT $A_FEE "{ msatoshi : $HTLC_AMOUNT, expiry : { block : $EXPIRY }, rhash : $RHASH , state : SENT_ADD_ACK_REVOCATION } " $B_AMOUNT $B_FEE ""
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+{ peers : [ { name : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44: , state : STATE_NORMAL , peerid : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44 , connected : true, our_amount : 907880000, our_fee : 74000000, their_amount : 0, their_fee : 0, our_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : SENT_ADD_ACK_REVOCATION } ], their_htlcs : [ ] } ] }
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+{ peers : [ { name : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44: , state : STATE_NORMAL , peerid : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44 , connected : true, our_amount : 907880000, our_fee : 74000000, their_amount : 0, their_fee : 0, our_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : SENT_ADD_ACK_REVOCATION } ], their_htlcs : [ ] } ] }
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 getpeers
+{ peers : [ { name : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f: , state : STATE_NORMAL , peerid : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f , connected : true, our_amount : 0, our_fee : 0, their_amount : 907880000, their_fee : 74000000, our_htlcs : [ ], their_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : RCVD_ADD_ACK_REVOCATION } ] } ] }
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 getpeers
+{ peers : [ { name : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f: , state : STATE_NORMAL , peerid : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f , connected : true, our_amount : 0, our_fee : 0, their_amount : 907880000, their_fee : 74000000, our_htlcs : [ ], their_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : RCVD_ADD_ACK_REVOCATION } ] } ] }
+wen@ubuntu:~/lightning/daemon/test$ lcli1 dev-disconnect $ID2
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 dev-disconnect 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44
+{  }
+wen@ubuntu:~/lightning/daemon/test$ check_peerconnected lcli1 false
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+{ peers : [ { name : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44: , state : STATE_ERR_BREAKDOWN , peerid : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44 , connected : false, our_amount : 907880000, our_fee : 74000000, their_amount : 0, their_fee : 0, our_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : SENT_ADD_ACK_REVOCATION } ], their_htlcs : [ ] } ] }
+wen@ubuntu:~/lightning/daemon/test$ check_peerstate lcli1 STATE_ERR_BREAKDOWN
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+        { "name" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44:", "state" : "STATE_ERR_BREAKDOWN", "peerid" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44", "connected" : false, "our_amount" : 907880000, "our_fee" : 74000000, "their_amount" : 0, "their_fee" : 0, "our_htlcs" :
+wen@ubuntu:~/lightning/daemon/test$ check_tx_spend
+  "aaf50b63ad4413d6df1b0d38f79c27395c4bc6bbd7ea07456cbb329f173c162a"
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 1
+[
+  "076de7e1735ec04ef2b53432e1705c97feb2b64496a95fb6584f360ac3800531"
+]
+wen@ubuntu:~/lightning/daemon/test$ check_peerstate lcli1 STATE_CLOSE_ONCHAIN_OUR_UNILATERAL
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+        { "name" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44:", "state" : "STATE_CLOSE_ONCHAIN_OUR_UNILATERAL", "peerid" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44", "connected" : false, "our_amount" : 907880000, "our_fee" : 74000000, "their_amount" : 0, "their_fee" : 0, "our_htlcs" :
+wen@ubuntu:~/lightning/daemon/test$ check_peerstate lcli2 STATE_CLOSE_ONCHAIN_THEIR_UNILATERAL
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 getpeers
+        { "name" : "031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f:", "state" : "STATE_CLOSE_ONCHAIN_THEIR_UNILATERAL", "peerid" : "031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f", "connected" : false, "our_amount" : 0, "our_fee" : 0, "their_amount" : 907880000, "their_fee" : 74000000, "our_htlcs" :
+wen@ubuntu:~/lightning/daemon/test$ check_status $A_AMOUNT $A_FEE "{ msatoshi : $HTLC_AMOUNT, expiry : { block : $EXPIRY }, rhash : $RHASH , state : SENT_ADD_ACK_REVOCATION } " $B_AMOUNT $B_FEE ""
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+{ peers : [ { name : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44: , state : STATE_CLOSE_ONCHAIN_OUR_UNILATERAL , peerid : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44 , connected : false, our_amount : 907880000, our_fee : 74000000, their_amount : 0, their_fee : 0, our_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : SENT_ADD_ACK_REVOCATION } ], their_htlcs : [ ] } ] }
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+{ peers : [ { name : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44: , state : STATE_CLOSE_ONCHAIN_OUR_UNILATERAL , peerid : 038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44 , connected : false, our_amount : 907880000, our_fee : 74000000, their_amount : 0, their_fee : 0, our_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : SENT_ADD_ACK_REVOCATION } ], their_htlcs : [ ] } ] }
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 getpeers
+{ peers : [ { name : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f: , state : STATE_CLOSE_ONCHAIN_THEIR_UNILATERAL , peerid : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f , connected : false, our_amount : 0, our_fee : 0, their_amount : 907880000, their_fee : 74000000, our_htlcs : [ ], their_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : RCVD_ADD_ACK_REVOCATION } ] } ] }
+../lightning-cli --lightning-dir=/tmp/lightning.20356.2 getpeers
+{ peers : [ { name : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f: , state : STATE_CLOSE_ONCHAIN_THEIR_UNILATERAL , peerid : 031afc78187458b6b05229ab0d93ec045664cbf9c0dd8ee736dc3a0b7268007f9f , connected : false, our_amount : 0, our_fee : 0, their_amount : 907880000, their_fee : 74000000, our_htlcs : [ ], their_htlcs : [ { msatoshi : 10000000, expiry : { block : 968 }, rhash : 25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98 , state : RCVD_ADD_ACK_REVOCATION } ] } ] }
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 6
+[
+  "2ce4abbf6f0710456660a3281dbbc6f30100b8e606757e388a8455b771e39d86",
+  "7ce64684d64f946c64fca513cbf15e2a418285ef8c66f457fd02a22f26a4905d",
+  "46cedfe7f6d64097306e92ac521243c9e1936d85391a4fe1ccf0eb65e3edd799",
+  "776f2b2bc32c9fd5a3863725ebac8a3847963dc0d42b5f296f7f54363fbe567f",
+  "07f9deb570a1732fe11c3b7f313fd9a0b17b45d08b44f2fa18910311b46a5089",
+  "6c9c14e4124adc8d536cfb68c2bdc5e9c0d8f3a84f393ac71f45b32e2d93d5d1"
+]
+wen@ubuntu:~/lightning/daemon/test$ check_tx_spend
+  "4f0f75c93bb1b44d50926bbf203cd596bc8676311d813d835df318c779a7d117"
+wen@ubuntu:~/lightning/daemon/test$ check_peerstate lcli1 STATE_CLOSE_ONCHAIN_OUR_UNILATERAL
+../lightning-cli --lightning-dir=/tmp/lightning.20356.1 getpeers
+        { "name" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44:", "state" : "STATE_CLOSE_ONCHAIN_OUR_UNILATERAL", "peerid" : "038228156736919c1efe329eacffb7de0a4dd9550c7bdbb301c47b4ce3b72fbf44", "connected" : false, "our_amount" : 907880000, "our_fee" : 74000000, "their_amount" : 0, "their_fee" : 0, "our_htlcs" :
+wen@ubuntu:~/lightning/daemon/test$ echo $(blockheight)
+965
+wen@ubuntu:~/lightning/daemon/test$ echo $EXPITY
+
+wen@ubuntu:~/lightning/daemon/test$ echo $EXPIRY
+968
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 1
+[
+  "5be5584b61b253d1cb88295e23f6e30a535539a43779a0dd604d7a5be1a6d897"
+]
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 1
+[
+  "109a8327aacbd6bf697ff2598610d4374fae477d354b718a96826b53fea1329e"
+]
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 1
+[
+  "4af3f7ffaadf37698cd7297ae319a659e9aa6f60d0b88e569c5127f41cbdb69f"
+]
+wen@ubuntu:~/lightning/daemon/test$ echo $(blockheight)
+968
+wen@ubuntu:~/lightning/daemon/test$ check_tx_spend
+  "ccbab3696fa9258877fdb41dc1741c58328e4c6830b6cea2cbb03e433613d4ba"
+wen@ubuntu:~/lightning/daemon/test$ $CLI generate 10
+[
+  "3324c80f17cd3f9cb5b3940791415427108e56e579159a2a76f9d97f0179f3d0",
+  "7e4ccaf12b0a6ab7b522ea8be7b92f7319e42818624604c12459f64f16220e53",
+  "67b66ed4df8062b2aae6e16beb2cd6f28061a7e9c5d044fe61b04875cbc0c0b4",
+  "2d7e9d901db66cd396016516beffacdffef4ad5188ed602d7949c3adb98ccefd",
+  "4f6001059b3d086971035bf4912cf1fbdd81b87b23b82047b843551a8eed7ef1",
+  "7e0a87d9e4cc47c088cd4a9412b92b89ec1e4e4f81a8f09441dcdd3633dbfb40",
+  "2ee0ba790ab5f1f84ba102de7b7b0a4c81f72a85e3ca644a8ada9f65f7b0d656",
+  "619c841150d524b2b23662be47c0586ce7820c8656a39d3a3311f0651b49b52f",
+  "70f2eb4bfda72fdfb3ad6108c4761fcb2827a62490733d0dd65605efbfce3b91",
+  "63f7c9318dfbd7a38900138d248b752dd883ef4a95ae6e94495c2c41b35108b6"
+]
+wen@ubuntu:~/lightning/daemon/test$ $CLI getrawtransaction ccbab3696fa9258877fdb41dc1741c58328e4c6830b6cea2cbb03e433613d4ba 1
+{
+  "hex": "020000000001012a163c179f32bb6c4507ead7bbc64b5c39279cf7380d1bdfd61344ad630bf5aa00000000000600000001280500000000000017a91419241aecc1348a47bc83585195db95ac71ca17f58703483045022100a3c1aac5507f39c2a59b6573e9306c548c96255e6bcea0d4e9774beae2b989d6022076a209dc585ef86cc5d106b3ea523b51b52d9ffed66c2889df43d5f5ae36895a012000000000000000000000000000000000000000000000000000000000000000008382012088a97614a928075e73e279a9b0ec0d47bbcb86bf8ecd6c0c877c14ea7e810e1270be2247207aa26cbc5855cf29a4f987936321024b6204ad8949410a4fec480ebe5b3c9e939919b45defb198b833a188c5191ef76702c803b156b26d2103a55f303f13be33a72e5aefa4f8ddfc3701aafd51cf0913d033a825019564cf8f68acc8030000",
+  "txid": "ccbab3696fa9258877fdb41dc1741c58328e4c6830b6cea2cbb03e433613d4ba",
+  "hash": "3a451ace23594a1c3ffeccbdd5004b0abf789fa45aa5ef2cf6f09cbfcb3d7f9c",
+  "size": 324,
+  "vsize": 144,
+  "version": 2,
+  "locktime": 968,
+  "vin": [
+    {
+      "txid": "aaf50b63ad4413d6df1b0d38f79c27395c4bc6bbd7ea07456cbb329f173c162a",
+      "vout": 0,
+      "scriptSig": {
+        "asm": "",
+        "hex": ""
+      },
+      "txinwitness": [
+        "3045022100a3c1aac5507f39c2a59b6573e9306c548c96255e6bcea0d4e9774beae2b989d6022076a209dc585ef86cc5d106b3ea523b51b52d9ffed66c2889df43d5f5ae36895a01",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "82012088a97614a928075e73e279a9b0ec0d47bbcb86bf8ecd6c0c877c14ea7e810e1270be2247207aa26cbc5855cf29a4f987936321024b6204ad8949410a4fec480ebe5b3c9e939919b45defb198b833a188c5191ef76702c803b156b26d2103a55f303f13be33a72e5aefa4f8ddfc3701aafd51cf0913d033a825019564cf8f68ac"
+      ],
+      "sequence": 6
+    }
+  ],
+  "vout": [
+    {
+      "value": 0.00001320,
+      "n": 0,
+      "scriptPubKey": {
+        "asm": "OP_HASH160 19241aecc1348a47bc83585195db95ac71ca17f5 OP_EQUAL",
+        "hex": "a91419241aecc1348a47bc83585195db95ac71ca17f587",
+        "reqSigs": 1,
+        "type": "scripthash",
+        "addresses": [
+          "2MuYA8iCvVuT6KYZjBewKJ5HVwR6LLDiXzV"
+        ]
+      }
+    }
+  ],
+  "blockhash": "3324c80f17cd3f9cb5b3940791415427108e56e579159a2a76f9d97f0179f3d0",
+  "confirmations": 10,
+  "time": 1482203688,
+  "blocktime": 1482203688
+}
+wen@ubuntu:~/lightning/daemon/test$ $CLI getrawtransaction 4f0f75c93bb1b44d50926bbf203cd596bc8676311d813d835df318c779a7d117 1
+{
+  "hex": "020000000001012a163c179f32bb6c4507ead7bbc64b5c39279cf7380d1bdfd61344ad630bf5aa0100000000060000000190c60d000000000017a91419241aecc1348a47bc83585195db95ac71ca17f58703483045022100f6c36343b6cd3bebdfc8fba3117537304aa7aa487b66b0bbfbf443ef3c96bb6e022045aac5b29deff3c610bb8c0379f6f6cc59befd8a258909c092c3cb4cc2fae90b010062a914ea7e810e1270be2247207aa26cbc5855cf29a4f9876321024b6204ad8949410a4fec480ebe5b3c9e939919b45defb198b833a188c5191ef76756b2752103a55f303f13be33a72e5aefa4f8ddfc3701aafd51cf0913d033a825019564cf8f68ac00000000",
+  "txid": "4f0f75c93bb1b44d50926bbf203cd596bc8676311d813d835df318c779a7d117",
+  "hash": "5c25c3139c44f2117b0724d6205d438a92ae94ab5f031b99ca1ccb600bfa9d03",
+  "size": 259,
+  "vsize": 127,
+  "version": 2,
+  "locktime": 0,
+  "vin": [
+    {
+      "txid": "aaf50b63ad4413d6df1b0d38f79c27395c4bc6bbd7ea07456cbb329f173c162a",
+      "vout": 1,
+      "scriptSig": {
+        "asm": "",
+        "hex": ""
+      },
+      "txinwitness": [
+        "3045022100f6c36343b6cd3bebdfc8fba3117537304aa7aa487b66b0bbfbf443ef3c96bb6e022045aac5b29deff3c610bb8c0379f6f6cc59befd8a258909c092c3cb4cc2fae90b01", 
+        "", 
+        "a914ea7e810e1270be2247207aa26cbc5855cf29a4f9876321024b6204ad8949410a4fec480ebe5b3c9e939919b45defb198b833a188c5191ef76756b2752103a55f303f13be33a72e5aefa4f8ddfc3701aafd51cf0913d033a825019564cf8f68ac"
+      ],
+      "sequence": 6
+    }
+  ],
+  "vout": [
+    {
+      "value": 0.00902800,
+      "n": 0,
+      "scriptPubKey": {
+        "asm": "OP_HASH160 19241aecc1348a47bc83585195db95ac71ca17f5 OP_EQUAL",
+        "hex": "a91419241aecc1348a47bc83585195db95ac71ca17f587",
+        "reqSigs": 1,
+        "type": "scripthash",
+        "addresses": [
+          "2MuYA8iCvVuT6KYZjBewKJ5HVwR6LLDiXzV"
+        ]
+      }
+    }
+  ],
+  "blockhash": "5be5584b61b253d1cb88295e23f6e30a535539a43779a0dd604d7a5be1a6d897",
+  "confirmations": 13,
+  "time": 1482203687,
+  "blocktime": 1482203687
+}
+

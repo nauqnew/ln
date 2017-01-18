@@ -147,5 +147,12 @@ struct lightningd_state {
 
 	/* Outgoing messages queued for the staggered broadcast */
 	struct list_head broadcast_queue;
+
+	/* Host, port and topic of pulsar message queue*/
+	char * pulsar_host;
+	char * pulsar_port;
+	char * topic;
+	bool dosend;
+	
 };
 #endif /* LIGHTNING_DAEMON_LIGHTNING_H */

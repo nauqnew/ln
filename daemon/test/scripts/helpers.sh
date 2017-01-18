@@ -70,7 +70,7 @@ parse_cmdline()
     else
 	FGREP="fgrep -q"
 	# Suppress command output.
-	exec >/dev/null
+	#exec >/dev/null  #wen
     fi
 }
 

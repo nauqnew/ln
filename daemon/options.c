@@ -198,6 +198,18 @@ static void config_register_opts(struct lightningd_state *dstate)
 	opt_register_noarg("--ignore-dbversion", opt_set_bool,
 			   &dstate->config.db_version_ignore,
 			   "Continue despite invalid database version (DANGEROUS!)");
+	opt_register_arg("--pulsar-host", opt_set_charp, NULL,
+			   &dstate->pulsar_host,
+			   "Host of the message queue server");
+	opt_register_arg("--pulsar-port", opt_set_charp, NULL,
+			   &dstate->pulsar_port,
+			   "Port of the message queue server");
+	opt_register_arg("--pulsar-topic", opt_set_charp, NULL,
+			   &dstate->topic,
+			   "Subscription topic");
+	opt_register_noarg("--send-to-pulsar", opt_set_bool,
+			   &dstate->dosend,
+			   "If send the message to the queue or not");
 }
 
 static void dev_register_opts(struct lightningd_state *dstate)

@@ -2,6 +2,7 @@
 #define LIGHTNING_DAEMON_PACKETS_H
 #include "config.h"
 #include "lightning.pb-c.h"
+#include "bitcoind.h"
 
 struct peer;
 struct htlc;

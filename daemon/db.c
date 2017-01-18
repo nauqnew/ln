@@ -25,6 +25,8 @@
 #include <stdarg.h>
 #include <unistd.h>
 
+#include "pulsar_interface.h"
+#include "cJSON.h"
 #define DB_FILE "lightning.sqlite3"
 
 /* They don't use stdint types. */
@@ -1330,6 +1332,21 @@ void db_init(struct lightningd_state *dstate)
 		      SQL_BOOL(offered_anchor), SQL_U32(our_feerate),
 		      "PRIMARY KEY(peer)")
 		TABLE(version, "version VARCHAR(100)"));
+
+	/* send version to the queue.*/
+	cJSON * root = cJSON_CreateObject(); 
+	cJSON *item = cJSON_CreateString(VERSION);
+	cJSON_AddItemToObject(root,"version",item); 
+	
+	if(dstate->dosend)
+	{
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);  //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	db_exec(__func__, dstate, "INSERT INTO version VALUES ('"VERSION"');");
 	db_exec(__func__, dstate, "COMMIT;");
 	dstate->db->in_transaction = false;
@@ -1348,7 +1365,68 @@ void db_set_anchor(struct peer *peer)
 	assert(peer->dstate->db->in_transaction);
 	peerid = pubkey_to_hexstr(ctx, peer->id);
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
+	
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+	
+		cJSON * anchors = cJSON_CreateObject();
+		cJSON * item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(anchors, "peerid",item);
+		item = cJSON_CreateString((const char *)( tal_hexstr(ctx, &peer->anchor.txid, sizeof(peer->anchor.txid))));
+		cJSON_AddItemToObject(anchors, "txid",item);
+		item=cJSON_CreateNumber(peer->anchor.index);
+		cJSON_AddItemToObject(anchors, "index",item);
+		item=cJSON_CreateNumber(peer->anchor.satoshis);
+		cJSON_AddItemToObject(anchors, "satoshis",item);
+		item=cJSON_CreateNumber(peer->anchor.ok_depth);
+		cJSON_AddItemToObject(anchors, "ok_depth",item);
+		item=cJSON_CreateNumber(peer->anchor.min_depth);
+		cJSON_AddItemToObject(anchors, "min_depth",item);
+		item=cJSON_CreateBool(peer->anchor.ours);
+		cJSON_AddItemToObject(anchors, "ours",item);
+		cJSON_AddItemToObject(root,"anchors",anchors);  //add achors to root
+		
+		cJSON* commit_info=cJSON_CreateArray();
 
+		cJSON * local_commit = cJSON_CreateObject();
+			item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(local_commit, "peerid",item);	
+		item = cJSON_CreateString(side_to_str(LOCAL));
+		cJSON_AddItemToObject(local_commit, "side",item);	
+		item = cJSON_CreateString((const char *)(tal_hexstr(ctx, &peer->local.commit->revocation_hash,
+				   sizeof(peer->local.commit->revocation_hash))));
+		cJSON_AddItemToObject(local_commit, "revocation_hash",item);
+		item=cJSON_CreateNumber(peer->local.commit->order);
+		cJSON_AddItemToObject(local_commit, "order",item);
+		item = cJSON_CreateString((const char *)(sig_to_sql(ctx, peer->local.commit->sig)));
+		cJSON_AddItemToObject(local_commit, "sig",item);
+		cJSON_AddItemToArray(commit_info,local_commit);
+		
+		cJSON * remote_commit = cJSON_CreateObject();
+		
+		item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(remote_commit, "peerid",item);
+		item = cJSON_CreateString(side_to_str(REMOTE));
+		cJSON_AddItemToObject(remote_commit, "side",item);
+		item = cJSON_CreateString((const char *)(tal_hexstr(ctx, &peer->remote.commit->revocation_hash,
+				   sizeof(peer->remote.commit->revocation_hash))));
+		cJSON_AddItemToObject(remote_commit, "revocation_hash",item);
+		item=cJSON_CreateNumber(peer->remote.commit->order);
+		cJSON_AddItemToObject(remote_commit, "order",item);
+		item = cJSON_CreateString((const char *)(sig_to_sql(ctx, peer->remote.commit->sig)));
+		cJSON_AddItemToObject(remote_commit, "sig",item);
+		cJSON_AddItemToArray(commit_info,remote_commit);
+		
+		cJSON_AddItemToObject(root,"commit_info",commit_info); //add commit_info to root
+			
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic); 
+		cJSON_Delete(root); //only needs to delete the root.
+		if(data != NULL)
+			free(data);
+	}
+	
 	db_exec(__func__, peer->dstate,
 		"INSERT INTO anchors VALUES (x'%s', x'%s', %u, %"PRIu64", %i, %u, %s);",
 		peerid,
@@ -1393,6 +1471,37 @@ void db_set_visible_state(struct peer *peer)
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 	assert(peer->dstate->db->in_transaction);
 
+	
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+		cJSON * their_visible_state = cJSON_CreateObject(); //create object htlcs
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(their_visible_state, "peer",item);
+		item = cJSON_CreateString(sql_bool(peer->remote.offer_anchor));
+		cJSON_AddItemToObject(their_visible_state, "offered_anchor",item);
+		item = cJSON_CreateString(pubkey_to_hexstr(ctx, &peer->remote.commitkey));
+		cJSON_AddItemToObject(their_visible_state, "commitkey",item);
+		item = cJSON_CreateString(pubkey_to_hexstr(ctx, &peer->remote.finalkey));
+		cJSON_AddItemToObject(their_visible_state, "finalkey",item);
+		item = cJSON_CreateNumber(peer->remote.locktime.locktime);
+		cJSON_AddItemToObject(their_visible_state, "locktime",item);
+		item = cJSON_CreateNumber(peer->remote.mindepth);
+		cJSON_AddItemToObject(their_visible_state, "mindepth",item);
+		item = cJSON_CreateNumber(peer->remote.commit_fee_rate);
+		cJSON_AddItemToObject(their_visible_state, "commit_fee_rate",item);
+		item = cJSON_CreateString((const char*)tal_hexstr(ctx, &peer->remote.next_revocation_hash,
+				   sizeof(peer->remote.next_revocation_hash)));
+		cJSON_AddItemToObject(their_visible_state, "rhash",item);
+		cJSON_AddItemToObject(root,"their_visible_state",their_visible_state); // add htlcs to root object.
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	db_exec(__func__, peer->dstate,
 		"INSERT INTO their_visible_state VALUES (x'%s', %s, x'%s', x'%s', %u, %u, %"PRIu64", x'%s');",
 		peerid,
@@ -1417,6 +1526,26 @@ void db_update_next_revocation_hash(struct peer *peer)
 		tal_hexstr(ctx, &peer->remote.next_revocation_hash,
 			   sizeof(peer->remote.next_revocation_hash)));
 	assert(peer->dstate->db->in_transaction);
+
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+		
+		cJSON * their_visible_state = cJSON_CreateObject(); 
+		cJSON * item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(their_visible_state, "peerid",item);
+		item = cJSON_CreateString((const char *)tal_hexstr(ctx, &peer->remote.next_revocation_hash,
+				   sizeof(peer->remote.next_revocation_hash)));
+		cJSON_AddItemToObject(their_visible_state, "next_revocation_hash",item);
+		cJSON_AddItemToObject(root,"update_next_revocation_hash",their_visible_state); 
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	db_exec(__func__, peer->dstate,
 		"UPDATE their_visible_state SET next_revocation_hash=x'%s' WHERE peer=x'%s';",
 		tal_hexstr(ctx, &peer->remote.next_revocation_hash,
@@ -1429,6 +1558,53 @@ void db_create_peer(struct peer *peer)
 {
 	const char *ctx = tal_tmpctx(peer);
 	const char *peerid = pubkey_to_hexstr(ctx, peer->id);
+	
+	if(peer->dstate->dosend)
+	{	
+		cJSON * root = cJSON_CreateObject();
+			
+		//secrets should never be leaked.
+		/*cJSON * secrets = cJSON_CreateObject();
+		cJSON * item = cJSON_CreateString((const char *)(peer_secrets_for_db(ctx, peer)));
+		cJSON_AddItemToObject(secrets, "ours",item);
+		cJSON_AddItemToObject(root,"secrets",secrets);*/
+
+		cJSON * peers = cJSON_CreateObject(); //create object peers
+		cJSON * item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(peers, "peerid",item);
+		item = cJSON_CreateString(state_name(peer->state));
+		cJSON_AddItemToObject(peers, "state",item);
+		item = cJSON_CreateString(sql_bool(peer->local.offer_anchor));
+		cJSON_AddItemToObject(peers, "offered anchor",item);
+		item = cJSON_CreateNumber(peer->local.commit_fee_rate);
+		cJSON_AddItemToObject(peers, "fee_rate",item);
+		cJSON_AddItemToObject(root,"peers",peers); //add peers to root object.
+
+		if (peer->local.offer_anchor)
+		{
+			cJSON * anchor_inputs = cJSON_CreateObject(); //create anchor_inputs
+			item = cJSON_CreateString((const char*)tal_hexstr(ctx, &peer->anchor.input->txid,
+						   sizeof(peer->anchor.input->txid)));
+			cJSON_AddItemToObject(anchor_inputs, "txid",item);
+			item = cJSON_CreateNumber(peer->anchor.input->index);
+			cJSON_AddItemToObject(anchor_inputs, "index",item);
+			item = cJSON_CreateNumber(peer->anchor.input->in_amount);
+			cJSON_AddItemToObject(anchor_inputs, "in_amount",item);
+			item = cJSON_CreateNumber(peer->anchor.input->out_amount);
+			cJSON_AddItemToObject(anchor_inputs, "out_amount",item);
+			item = cJSON_CreateString(pubkey_to_hexstr(ctx, &peer->anchor.input->walletkey));
+			cJSON_AddItemToObject(anchor_inputs, "walletkey",item);
+			cJSON_AddItemToObject(root,"anchor_inputs",anchor_inputs); // add achor_inputs to root object.
+		}
+		
+		
+		char *data = cJSON_Print(root);
+	    send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);  //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+
+	}
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 	assert(peer->dstate->db->in_transaction);
@@ -1508,6 +1684,44 @@ void db_new_htlc(struct peer *peer, const struct htlc *htlc)
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 	assert(peer->dstate->db->in_transaction);
 
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+		cJSON * htlcs = cJSON_CreateObject(); //create object htlcs
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(htlcs, "peer",item);
+		item = cJSON_CreateNumber(htlc->id);
+		cJSON_AddItemToObject(htlcs, "id",item);
+		item = cJSON_CreateString(htlc_state_name(htlc->state));
+		cJSON_AddItemToObject(htlcs, "state",item);
+		item = cJSON_CreateNumber(htlc->msatoshi);
+		cJSON_AddItemToObject(htlcs, "msatoshi",item);
+		item = cJSON_CreateNumber(abs_locktime_to_blocks(&htlc->expiry));
+		cJSON_AddItemToObject(htlcs, "expiry",item);
+		item = cJSON_CreateString((const char*)tal_hexstr(ctx, &htlc->rhash, sizeof(htlc->rhash)));
+		cJSON_AddItemToObject(htlcs, "rhash",item);
+		item = cJSON_CreateString((const char*)tal_hexstr(ctx, htlc->routing, tal_count(htlc->routing)));
+		cJSON_AddItemToObject(htlcs, "route",item);
+
+		if(htlc->src)
+		{
+			item = cJSON_CreateString(peerid);
+			cJSON_AddItemToObject(htlcs, "src_peer",item);
+			item = cJSON_CreateNumber(htlc->src->id);
+			cJSON_AddItemToObject(htlcs, "src_id",item);
+
+		}
+
+		cJSON_AddItemToObject(root,"htlcs",htlcs); // add htlcs to root object.
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+
+	}
+
 	if (htlc->src) {
 		db_exec(__func__, peer->dstate,
 			"INSERT INTO htlcs VALUES"
@@ -1565,6 +1779,31 @@ void db_update_htlc_state(struct peer *peer, const struct htlc *htlc,
 		  htlc->id, htlc_state_name(oldstate),
 		  htlc_state_name(htlc->state));
 	assert(peer->dstate->db->in_transaction);
+
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * htlcs = cJSON_CreateObject(); //create object htlcs
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(htlcs, "peer",item);
+		item = cJSON_CreateNumber(htlc->id);
+		cJSON_AddItemToObject(htlcs, "id",item);
+		item = cJSON_CreateString(htlc_state_name(htlc->state));
+		cJSON_AddItemToObject(htlcs, "newstate",item);
+		item = cJSON_CreateString(htlc_state_name(oldstate));
+		cJSON_AddItemToObject(htlcs, "oldstate",item);
+
+		cJSON_AddItemToObject(root,"state changed", htlcs); // add htlcs to root object.
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+
+	}
+
 	db_exec(__func__, peer->dstate,
 		"UPDATE htlcs SET state='%s' WHERE peer=x'%s' AND id=%"PRIu64" AND state='%s';",
 		htlc_state_name(htlc->state), peerid,
@@ -1615,6 +1854,25 @@ void db_update_state(struct peer *peer)
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * peers = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(peers, "peer",item);
+		item = cJSON_CreateString(state_name(peer->state));
+		cJSON_AddItemToObject(peers, "state",item);
+
+		cJSON_AddItemToObject(root,"peer_state_change",peers); 
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate,
 		"UPDATE peers SET state='%s' WHERE peer=x'%s';",
@@ -1628,6 +1886,29 @@ void db_htlc_fulfilled(struct peer *peer, const struct htlc *htlc)
 	const char *peerid = pubkey_to_hexstr(ctx, peer->id);
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
+
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * htlcs = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(htlcs, "peer",item);
+		item = cJSON_CreateString((const char*)tal_hexstr(ctx, htlc->r, sizeof(*htlc->r)));
+		cJSON_AddItemToObject(htlcs, "r",item);
+		item = cJSON_CreateNumber(htlc->id);
+		cJSON_AddItemToObject(htlcs, "id",item);
+		item = cJSON_CreateString(htlc_state_name(htlc->state));
+		cJSON_AddItemToObject(htlcs, "state",item);
+
+		cJSON_AddItemToObject(root,"htlc_fulfilled",htlcs); 
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
 
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate,
@@ -1646,6 +1927,29 @@ void db_htlc_failed(struct peer *peer, const struct htlc *htlc)
 	const char *peerid = pubkey_to_hexstr(ctx, peer->id);
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
+
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * htlcs = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(htlcs, "peer",item);
+		item = cJSON_CreateString((const char*)tal_hexstr(ctx, htlc->fail, sizeof(*htlc->fail)));
+		cJSON_AddItemToObject(htlcs, "r",item);
+		item = cJSON_CreateNumber(htlc->id);
+		cJSON_AddItemToObject(htlcs, "id",item);
+		item = cJSON_CreateString(htlc_state_name(htlc->state));
+		cJSON_AddItemToObject(htlcs, "state",item);
+
+		cJSON_AddItemToObject(root,"htlc_failed",htlcs); 
+		
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
 
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate,
@@ -1672,6 +1976,33 @@ void db_new_commit_info(struct peer *peer, enum side side,
 		ci = peer->local.commit;
 	} else {
 		ci = peer->remote.commit;
+	}
+
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * commit = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(commit, "peerid",item);	
+		item=cJSON_CreateNumber(ci->commit_num);
+		cJSON_AddItemToObject(commit, "commit_num",item);
+		item = cJSON_CreateString(side_to_str(side));
+		cJSON_AddItemToObject(commit, "side",item);	
+		item = cJSON_CreateString((const char *)(tal_hexstr(ctx, &ci->revocation_hash,
+				   sizeof(ci->revocation_hash))));
+		cJSON_AddItemToObject(commit, "revocation_hash",item);
+		item=cJSON_CreateNumber(ci->order);
+		cJSON_AddItemToObject(commit, "order",item);
+		item = cJSON_CreateString((const char *)(sig_to_sql(ctx, ci->sig)));
+		cJSON_AddItemToObject(commit, "sig",item);
+		cJSON_AddItemToObject(root,"new_commit_info",commit);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
 	}
 
 	db_exec(__func__, peer->dstate, "UPDATE commit_info SET commit_num=%"PRIu64", revocation_hash=x'%s', sig=%s, xmit_order=%"PRIi64", prev_revocation_hash=%s WHERE peer=x'%s' AND side='%s';",
@@ -1708,6 +2039,24 @@ void db_save_shachain(struct peer *peer)
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * shachain = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(linearize_shachain(ctx, &peer->their_preimages));
+		cJSON_AddItemToObject(shachain, "shachain",item);	
+		item=cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(shachain, "peer",item);
+		cJSON_AddItemToObject(root,"shachain",shachain);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate, "UPDATE shachain SET shachain=x'%s' WHERE peer=x'%s';",
 		linearize_shachain(ctx, &peer->their_preimages),
@@ -1723,7 +2072,28 @@ void db_add_commit_map(struct peer *peer,
 
 	log_debug(peer->log, "%s(%s),commit_num=%"PRIu64, __func__, peerid,
 		  commit_num);
+	
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
 
+		cJSON * their_commitment= cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(their_commitment, "peerid",item);	
+		item=cJSON_CreateNumber(commit_num);
+		cJSON_AddItemToObject(their_commitment, "commit_num",item);
+		item = cJSON_CreateString((const char *)tal_hexstr(ctx, txid, sizeof(*txid)));
+		cJSON_AddItemToObject(their_commitment, "txid",item);
+		cJSON_AddItemToObject(root,"their_commitments",their_commitment);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+
+	}
+	
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate,
 		"INSERT INTO their_commitments VALUES (x'%s', x'%s', %"PRIu64");",
@@ -1742,6 +2112,25 @@ bool db_add_peer_address(struct lightningd_state *dstate,
 
 	log_debug(dstate->base_log, "%s", __func__);
 
+	if(dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * peer_address= cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(pubkey_to_hexstr(ctx, &addr->id));
+		cJSON_AddItemToObject(peer_address, "peer",item);	
+		item=cJSON_CreateString(netaddr_to_hex(ctx, &addr->addr));
+		cJSON_AddItemToObject(peer_address, "addr",item);
+		cJSON_AddItemToObject(root,"peer_address",peer_address);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+
+	}
+	
 	assert(!dstate->db->in_transaction);
 	ok = db_exec(__func__, dstate,
 		     "INSERT OR REPLACE INTO peer_address VALUES (x'%s', x'%s');",
@@ -1796,6 +2185,27 @@ void db_set_our_closing_script(struct peer *peer)
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * our_close_script= cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(our_close_script, "peerid",item);	
+		item = cJSON_CreateString((const char *)tal_hexstr(ctx, peer->closing.our_script,
+				   tal_count(peer->closing.our_script)));
+		cJSON_AddItemToObject(our_close_script, "scipt",item);
+		item=cJSON_CreateNumber(peer->closing.shutdown_order);
+		cJSON_AddItemToObject(our_close_script, "shutdown_order",item);
+		cJSON_AddItemToObject(root,"our_close_script",our_close_script);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate, "UPDATE closing SET our_script=x'%s',shutdown_order=%"PRIu64" WHERE peer=x'%s';",
 		tal_hexstr(ctx, peer->closing.our_script,
@@ -1811,7 +2221,26 @@ void db_set_their_closing_script(struct peer *peer)
 	const char *peerid = pubkey_to_hexstr(ctx, peer->id);
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
+	
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
 
+		cJSON * their_close_script= cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(their_close_script, "peerid",item);	
+		item = cJSON_CreateString((const char *)tal_hexstr(ctx, peer->closing.their_script,
+				   tal_count(peer->closing.their_script)));
+		cJSON_AddItemToObject(their_close_script, "scipt",item);
+		cJSON_AddItemToObject(root,"their_close_script",their_close_script);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+	
 	assert(peer->dstate->db->in_transaction);
 	db_exec(__func__, peer->dstate,
 		"UPDATE closing SET their_script=x'%s' WHERE peer=x'%s';",
@@ -1830,7 +2259,27 @@ void db_update_our_closing(struct peer *peer)
 	const char *peerid = pubkey_to_hexstr(ctx, peer->id);
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
+	
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
 
+		cJSON * our_closing = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(our_closing, "peerid",item);	
+		item = cJSON_CreateNumber(peer->closing.our_fee);
+		cJSON_AddItemToObject(our_closing, "our_fee",item);
+		item = cJSON_CreateNumber(peer->closing.closing_order);
+		cJSON_AddItemToObject(our_closing, "closing_order",item);
+		cJSON_AddItemToObject(root,"our_closing",our_closing);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+	
 	db_exec(__func__, peer->dstate,
 		"UPDATE closing SET our_fee=%"PRIu64", closing_order=%"PRIi64" WHERE peer=x'%s';",
 		peer->closing.our_fee,
@@ -1846,6 +2295,28 @@ bool db_update_their_closing(struct peer *peer)
 	const char *peerid = pubkey_to_hexstr(ctx, peer->id);
 
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
+
+	if(peer->dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * their_closing = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(peerid);
+		cJSON_AddItemToObject(their_closing, "peerid",item);	
+		item = cJSON_CreateNumber(peer->closing.their_fee);
+		cJSON_AddItemToObject(their_closing, "their_fee",item);
+		item = cJSON_CreateString(sig_to_sql(ctx, peer->closing.their_sig));
+		cJSON_AddItemToObject(their_closing, "their_sig",item);
+		item = cJSON_CreateNumber(peer->closing.sigs_in);
+		cJSON_AddItemToObject(their_closing, "sigs_in",item);
+		cJSON_AddItemToObject(root,"their_closing",their_closing);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
 
 	assert(!peer->dstate->db->in_transaction);
 	ok = db_exec(__func__, peer->dstate,
@@ -1869,6 +2340,30 @@ bool db_new_pay_command(struct lightningd_state *dstate,
 
 	log_debug(dstate->base_log, "%s", __func__);
 	log_add_struct(dstate->base_log, "(%s)", struct sha256, rhash);
+	
+	if(dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * pay = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(tal_hexstr(ctx, rhash, sizeof(*rhash)));
+		cJSON_AddItemToObject(pay, "rhash",item);	
+		item = cJSON_CreateNumber(msatoshi);
+		cJSON_AddItemToObject(pay, "msatoshi",item);
+		item = cJSON_CreateString(pubkeys_to_hex(ctx, ids));
+		cJSON_AddItemToObject(pay, "ids",item);
+		item = cJSON_CreateString(pubkey_to_hexstr(ctx, htlc->peer->id));
+		cJSON_AddItemToObject(pay, "htlc_peer",item);
+		item = cJSON_CreateNumber(htlc->id);
+		cJSON_AddItemToObject(pay, "htlc_id",item);
+		cJSON_AddItemToObject(root,"pay",pay);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);	
+	}
 
 	assert(!dstate->db->in_transaction);
 	ok = db_exec(__func__, dstate,
@@ -1894,6 +2389,29 @@ bool db_replace_pay_command(struct lightningd_state *dstate,
 	log_debug(dstate->base_log, "%s", __func__);
 	log_add_struct(dstate->base_log, "(%s)", struct sha256, rhash);
 
+	if(dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+		cJSON * pay = cJSON_CreateObject(); 
+		cJSON *	item = cJSON_CreateNumber(msatoshi);
+		cJSON_AddItemToObject(pay, "msatoshi",item);
+		item = cJSON_CreateString(pubkeys_to_hex(ctx, ids));
+		cJSON_AddItemToObject(pay, "ids",item);
+		item = cJSON_CreateString(pubkey_to_hexstr(ctx, htlc->peer->id));
+		cJSON_AddItemToObject(pay, "htlc_peer",item);
+		item = cJSON_CreateNumber(htlc->id);
+		cJSON_AddItemToObject(pay, "htlc_id",item);
+		item = cJSON_CreateString(tal_hexstr(ctx, rhash, sizeof(*rhash)));
+		cJSON_AddItemToObject(pay, "rhash",item);
+		cJSON_AddItemToObject(root,"replace_pay",pay);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+	
 	assert(!dstate->db->in_transaction);
 	ok = db_exec(__func__, dstate,
 		     "UPDATE pay SET msatoshi=%"PRIu64", ids=x'%s', htlc_peer=x'%s', htlc_id=%"PRIu64", r=NULL, fail=NULL WHERE rhash=x'%s';",
@@ -1914,6 +2432,36 @@ void db_complete_pay_command(struct lightningd_state *dstate,
 	log_debug(dstate->base_log, "%s", __func__);
 	log_add_struct(dstate->base_log, "(%s)", struct sha256, &htlc->rhash);
 
+	if(dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+		cJSON * pay = cJSON_CreateObject(); 
+
+		if(htlc->r)
+		{
+			cJSON * item = cJSON_CreateString((const char *)tal_hexstr(ctx, htlc->r, sizeof(*htlc->r)));
+			cJSON_AddItemToObject(pay, "fail",item);
+			item = cJSON_CreateString((const char *)tal_hexstr(ctx, &htlc->rhash, sizeof(htlc->rhash)));
+			cJSON_AddItemToObject(pay, "rhash",item);
+		}
+		else
+		{
+			cJSON * item = cJSON_CreateString((const char *)tal_hexstr(ctx, htlc->fail, tal_count(htlc->fail)));
+			cJSON_AddItemToObject(pay, "r",item);
+			item = cJSON_CreateString((const char *)tal_hexstr(ctx, &htlc->rhash, sizeof(htlc->rhash)));
+			cJSON_AddItemToObject(pay, "rhash",item);
+		}
+		
+		cJSON_AddItemToObject(root,"complete_pay",pay);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+
+	}
+	
 	assert(dstate->db->in_transaction);
 	if (htlc->r)
 		db_exec(__func__, dstate,
@@ -1941,6 +2489,29 @@ bool db_new_invoice(struct lightningd_state *dstate,
 
 	assert(!dstate->db->in_transaction);
 
+	if(dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * invoice = cJSON_CreateObject(); 
+		cJSON *	item = cJSON_CreateString((const char *)tal_hexstr(ctx, r, sizeof(*r)));
+		cJSON_AddItemToObject(invoice, "r",item);
+		item = cJSON_CreateNumber(msatoshi);
+		cJSON_AddItemToObject(invoice, "msatoshi",item);
+		item = cJSON_CreateString((const char *)tal_hexstr(ctx, label, strlen(label)));
+		cJSON_AddItemToObject(invoice, "label",item);
+		
+		item = cJSON_CreateString(sql_bool(false));
+		cJSON_AddItemToObject(invoice, "??",item); // what's this??wen.
+		cJSON_AddItemToObject(root,"new invoice",invoice);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
+
 	/* Insert label as hex; suspect injection attacks. */
 	ok = db_exec(__func__, dstate,
 		     "INSERT INTO invoice VALUES (x'%s', %"PRIu64", x'%s', %s);",
@@ -1958,6 +2529,26 @@ void db_resolve_invoice(struct lightningd_state *dstate,
 	const tal_t *ctx = tal_tmpctx(dstate);
 
 	log_debug(dstate->base_log, "%s", __func__);
+
+	if(dstate->dosend)
+	{
+		cJSON * root = cJSON_CreateObject();
+
+		cJSON * invoice = cJSON_CreateObject(); 
+		
+		cJSON *	item = cJSON_CreateNumber(paid_num);
+		cJSON_AddItemToObject(invoice, "paid_num",item);
+		item = cJSON_CreateString((const char *)tal_hexstr(ctx, label, strlen(label)));
+		cJSON_AddItemToObject(invoice, "label",item);
+		
+		cJSON_AddItemToObject(root,"resolve invoice",invoice);
+
+		char *data = cJSON_Print(root);
+		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);   //send to the queue.
+		cJSON_Delete(root);
+		if(data != NULL)
+			free(data);
+	}
 
 	assert(dstate->db->in_transaction);
 

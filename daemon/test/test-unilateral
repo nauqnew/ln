@@ -24,8 +24,8 @@ check_peerstate lcli2 STATE_NORMAL
 # Make sure node2 doesn't fail
 lcli2 dev-routefail false
 
-A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE))
-A_FEE=$NO_HTLCS_FEE
+A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE)) #924280000
+A_FEE=$NO_HTLCS_FEE #67600000
 B_AMOUNT=0
 B_FEE=0
 
@@ -38,8 +38,8 @@ RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
 
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 
-A_AMOUNT=$(($A_AMOUNT - $EXTRA_FEE - $HTLC_AMOUNT))
-A_FEE=$(($A_FEE + $EXTRA_FEE))
+A_AMOUNT=$(($A_AMOUNT - $EXTRA_FEE - $HTLC_AMOUNT)) #907880000
+A_FEE=$(($A_FEE + $EXTRA_FEE)) #74000000
 B_AMOUNT=0
 B_FEE=0
 

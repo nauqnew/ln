@@ -55,6 +55,11 @@ static struct lightningd_state *lightningd_state(void)
 	dstate->announce = NULL;
 	list_head_init(&dstate->broadcast_queue);
 	dstate->invoices = invoices_init(dstate);
+
+	dstate->pulsar_host = NULL;
+	dstate->pulsar_port = NULL;
+	dstate->topic = NULL;
+	dstate->dosend = false;
 	return dstate;
 }
 
