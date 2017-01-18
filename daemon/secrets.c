@@ -1,7 +1,6 @@
 #include "bitcoin/privkey.h"
 #include "bitcoin/shadouble.h"
 #include "bitcoin/signature.h"
-#include "bitcoin/base58.h"  
 #include "lightningd.h"
 #include "log.h"
 #include "peer.h"
@@ -21,7 +20,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "bitcoind.h"
 
 struct secret {
 	/* Secret ID of our node; public is dstate->id. */
@@ -147,22 +145,12 @@ static void new_keypair(struct lightningd_state *dstate,
 	} while (!pubkey_from_privkey(privkey, pubkey));
 }
 
-
-
 void peer_secrets_init(struct peer *peer)
 {
-//	char *base58_output;
-//    base58_output=(char *)malloc(BASE58_KEY_MAX_LEN );
-//	assert(base58_output != NULL);
-	
 	peer->secrets = tal(peer, struct peer_secrets);
+
 	new_keypair(peer->dstate, &peer->secrets->commit, &peer->local.commitkey);
 	new_keypair(peer->dstate, &peer->secrets->final, &peer->local.finalkey);
-
-//    secret_to_base58(base58_output, true, &peer->secrets->final);
-//   bitcoind_importprivkey(peer->dstate, base58_output, NULL, false, do_nothing, NULL);//wen
-//	free(base58_output);
-	
 	randombytes_buf(peer->secrets->revocation_seed.u.u8, sizeof(peer->secrets->revocation_seed.u.u8));
 }
 

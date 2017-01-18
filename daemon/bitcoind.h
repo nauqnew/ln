@@ -98,5 +98,4 @@ void bitcoind_getrawblock_(struct lightningd_state *dstate,
 						  struct lightningd_state *, \
 						  struct bitcoin_block *), \
 			      (arg))
-
 #endif /* LIGHTNING_DAEMON_BITCOIND_H */

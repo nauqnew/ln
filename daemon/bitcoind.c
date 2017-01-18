@@ -465,4 +465,3 @@ void bitcoind_getblockhash_(struct lightningd_state *dstate,
 	start_bitcoin_cli(dstate, NULL, process_getblockhash, false, cb, arg,
 			  "getblockhash", str, NULL);
 }
-

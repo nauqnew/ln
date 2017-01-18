@@ -211,15 +211,9 @@ PROGRAMS := $(TEST_PROGRAMS)
 
 CWARNFLAGS := -Werror -Wall -Wundef -Wmissing-prototypes -Wmissing-declarations -Wstrict-prototypes -Wold-style-definition
 CDEBUGFLAGS := -g -fstack-protector
+CFLAGS := $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) -I secp256k1/include/ -I libsodium/src/libsodium/include/ -I . $(FEATURES) $(COVFLAGS) -fPIC
 
-CFLAGS := $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) -I secp256k1/include/ -I . $(FEATURES) -fPIC
-
-LDLIBS := -lprotobuf-c -lgmp -lsodium -lsqlite3 -L /usr/lib -lpul -lboost_thread -lboost_system -lm
-
-CFLAGS := $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) -I secp256k1/include/ -I libsodium/src/libsodium/include/ -I . $(FEATURES) $(COVFLAGS)
-
-LDLIBS := -lprotobuf-c -lgmp -lsqlite3 $(COVFLAGS)
-
+LDLIBS := -lprotobuf-c -lgmp -lsqlite3 $(COVFLAGS)  -L /usr/lib -lpul -lboost_thread -lboost_system -lm
 $(PROGRAMS): CFLAGS+=-I.
 
 default: $(PROGRAMS) $(MANPAGES) daemon-all
