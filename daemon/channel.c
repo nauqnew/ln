@@ -125,8 +125,8 @@ static bool change_funding(uint64_t anchor_satoshis,
 
 bool anchor_too_large(uint64_t anchor_satoshis)
 {
-	/* Anchor must fit in 32 bit. */
-	return anchor_satoshis >= (1ULL << 32) / 1000;
+	/* Anchor must fit in 32 bit. */ //todo
+	return anchor_satoshis >= (1ULL << 60) / 1000;
 }
 
 struct channel_state *initial_cstate(const tal_t *ctx,
@@ -332,8 +332,8 @@ bool balance_after_force(struct channel_state *cstate)
 static char *fmt_channel_oneside(const tal_t *ctx,
 				 const struct channel_oneside *co)
 {
-	return tal_fmt(ctx, "{ pay_msat=%u"
-		       " fee_msat=%u"
+	return tal_fmt(ctx, "{ pay_msat=%"PRIu64
+		       " fee_msat=%"PRIu64
 		       " num_htlcs=%u }",
 		       co->pay_msat,
 		       co->fee_msat,

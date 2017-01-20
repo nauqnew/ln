@@ -371,7 +371,7 @@ struct  _UpdateAddHtlc
   /*
    * Amount for htlc (millisatoshi)
    */
-  uint32_t amount_msat;
+  uint64_t amount_msat;
   /*
    * Hash for HTLC R value.
    */

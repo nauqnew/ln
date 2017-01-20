@@ -2195,7 +2195,7 @@ static const ProtobufCFieldDescriptor update_add_htlc__field_descriptors[5] =
     "amount_msat",
     2,
     PROTOBUF_C_LABEL_REQUIRED,
-    PROTOBUF_C_TYPE_UINT32,
+    PROTOBUF_C_TYPE_UINT64,
     0,   /* quantifier_offset */
     offsetof(UpdateAddHtlc, amount_msat),
     NULL,

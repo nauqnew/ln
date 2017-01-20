@@ -17,7 +17,7 @@ enum side {
 
 struct channel_oneside {
 	/* Payment and fee is in millisatoshi. */
-	uint32_t pay_msat, fee_msat;
+	uint64_t pay_msat, fee_msat;
 	/* Number of HTLCs (required for limiting total number) */
 	unsigned int num_htlcs;
 };

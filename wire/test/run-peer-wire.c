@@ -201,7 +201,7 @@ struct msg_init {
 struct msg_update_add_htlc {
 	struct channel_id channel_id;
 	u64 id;
-	u32 amount_msat;
+    u64 amount_msat;
 	u32 expiry;
 	struct sha256 payment_hash;
 	u8 onion_routing_packet[1254];

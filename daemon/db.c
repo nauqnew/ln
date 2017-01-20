@@ -668,14 +668,14 @@ static void load_peer_htlcs(struct peer *peer)
 
 	peer->remote.staging_cstate = copy_cstate(peer, peer->remote.commit->cstate);
 	peer->local.staging_cstate = copy_cstate(peer, peer->local.commit->cstate);
-	log_debug(peer->log, "Local staging: pay %u/%u fee %u/%u htlcs %u/%u",
+	log_debug(peer->log, "Local staging: pay %"PRIu64"/%"PRIu64" fee %"PRIu64"/%"PRIu64" htlcs %u/%u",
 		  peer->local.staging_cstate->side[LOCAL].pay_msat,
 		  peer->local.staging_cstate->side[REMOTE].pay_msat,
 		  peer->local.staging_cstate->side[LOCAL].fee_msat,
 		  peer->local.staging_cstate->side[REMOTE].fee_msat,
 		  peer->local.staging_cstate->side[LOCAL].num_htlcs,
 		  peer->local.staging_cstate->side[REMOTE].num_htlcs);
-	log_debug(peer->log, "Remote staging: pay %u/%u fee %u/%u htlcs %u/%u",
+	log_debug(peer->log, "Remote staging: pay %"PRIu64"/%"PRIu64" fee %"PRIu64"/%"PRIu64" htlcs %u/%u",
 		  peer->remote.staging_cstate->side[LOCAL].pay_msat,
 		  peer->remote.staging_cstate->side[REMOTE].pay_msat,
 		  peer->remote.staging_cstate->side[LOCAL].fee_msat,

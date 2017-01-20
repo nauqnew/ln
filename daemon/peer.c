@@ -4317,7 +4317,7 @@ struct bitcoin_tx *peer_create_close_tx(const tal_t *ctx,
 	}
 
 	log_debug(peer->log,
-		  "creating close-tx with fee %"PRIu64" amounts %u/%u to ",
+		  "creating close-tx with fee %"PRIu64" amounts %"PRIu64"/%"PRIu64" to ",
 		  fee,
 		  cstate.side[LOCAL].pay_msat / 1000,
 		  cstate.side[REMOTE].pay_msat / 1000);
@@ -4555,10 +4555,10 @@ static void json_getpeers(struct command *cmd,
 		}
 		last = p->local.commit->cstate;
 
-		json_add_num(response, "our_amount", last->side[LOCAL].pay_msat);
-		json_add_num(response, "our_fee", last->side[LOCAL].fee_msat);
-		json_add_num(response, "their_amount", last->side[REMOTE].pay_msat);
-		json_add_num(response, "their_fee", last->side[REMOTE].fee_msat);
+		json_add_u64(response, "our_amount", last->side[LOCAL].pay_msat);
+		json_add_u64(response, "our_fee", last->side[LOCAL].fee_msat);
+		json_add_u64(response, "their_amount", last->side[REMOTE].pay_msat);
+		json_add_u64(response, "their_fee", last->side[REMOTE].fee_msat);
 		json_add_htlcs(response, "our_htlcs", p, LOCAL);
 		json_add_htlcs(response, "their_htlcs", p, REMOTE);
 		json_object_end(response);

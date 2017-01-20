@@ -165,13 +165,13 @@ struct bitcoin_tx *create_commit_tx(const tal_t *ctx,
 				    cstate->side[LOCAL].pay_msat / 1000,
 				    &total);
 	if (pays_to[LOCAL])
-		log_debug(peer->log, "Pays %u to local: %s",
+		log_debug(peer->log, "Pays %"PRIu64 "to local: %s",
 			  cstate->side[LOCAL].pay_msat / 1000,
 			  tal_hexstr(tmpctx,
 				     tx->output[tx->output_count-1].script,
 				     tx->output[tx->output_count-1].script_length));
 	else
-		log_debug(peer->log, "DOES NOT pay %u to local",
+		log_debug(peer->log, "DOES NOT pay %"PRIu64" to local",
 			  cstate->side[LOCAL].pay_msat / 1000);
 	pays_to[REMOTE] = add_output(tx, commit_output_to_them(tmpctx, peer,
 							       rhash, side,
@@ -179,13 +179,13 @@ struct bitcoin_tx *create_commit_tx(const tal_t *ctx,
 				     cstate->side[REMOTE].pay_msat / 1000,
 				     &total);
 	if (pays_to[REMOTE])
-		log_debug(peer->log, "Pays %u to remote: %s",
+		log_debug(peer->log, "Pays %"PRIu64" to remote: %s",
 			  cstate->side[REMOTE].pay_msat / 1000,
 			  tal_hexstr(tmpctx,
 				     tx->output[tx->output_count-1].script,
 				     tx->output[tx->output_count-1].script_length));
 	else
-		log_debug(peer->log, "DOES NOT pay %u to remote",
+		log_debug(peer->log, "DOES NOT pay %"PRIu64" to remote",
 			  cstate->side[REMOTE].pay_msat / 1000);
 
 	/* If their tx doesn't pay to them, or our tx doesn't pay to us... */
