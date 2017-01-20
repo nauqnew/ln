@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 4.0.2, 2017-01-20T16:22:55. -->
+<!-- Written by QtCreator 4.0.2, 2017-01-20T18:52:50. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -167,7 +167,7 @@
     </valuelist>
     <value type="int" key="PE.EnvironmentAspect.Base">2</value>
     <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
-    <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.Arguments">--lightning-dir=/home/wen/t/2</value>
+    <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.Arguments">--lightning-dir=/home/wen/t/1</value>
     <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.Executable">/home/wen/work/lightning/daemon/lightningd</value>
     <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.WorkingDirectory">%{buildDir}</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Run /home/wen/work/lightning/daemon/lightningd</value>

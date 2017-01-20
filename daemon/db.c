@@ -1333,13 +1333,13 @@ void db_init(struct lightningd_state *dstate)
 		      "PRIMARY KEY(peer)")
 		TABLE(version, "version VARCHAR(100)"));
 
-	/* send version to the queue.*/
-	cJSON * root = cJSON_CreateObject(); 
-	cJSON *item = cJSON_CreateString(VERSION);
-	cJSON_AddItemToObject(root,"version",item); 
-	
 	if(dstate->dosend)
 	{
+		/* send version to the queue.*/
+		cJSON * root = cJSON_CreateObject(); 
+		cJSON *item = cJSON_CreateString(VERSION);
+		cJSON_AddItemToObject(root,"version",item); 
+
 		char *data = cJSON_Print(root);
 		send_to_pulsar(data, dstate->pulsar_host, dstate->pulsar_port, dstate->topic);  //send to the queue.
 		cJSON_Delete(root);
