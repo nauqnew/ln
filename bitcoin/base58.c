@@ -115,7 +115,7 @@ char *key_to_base58(const tal_t *ctx, bool test_net, const struct privkey *key)
 	size_t outlen = sizeof(out);
 
 	memcpy(buf, key->secret, sizeof(key->secret));
-	//Mark this as a compressed key. 
+	/* Mark this as a compressed key.*/ 
 	buf[32] = 1;
 
 	b58check_enc(out, &outlen, version, buf, sizeof(buf));
