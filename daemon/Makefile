@@ -47,7 +47,6 @@ DAEMON_SRC :=					\
 	daemon/wallet.c				\
 	daemon/watch.c				\
 	daemon/names.c				\
-	daemon/cJSON.c                         \
 	irc.c                         
 
 DAEMON_OBJS := $(DAEMON_SRC:.c=.o)
@@ -101,8 +100,7 @@ DAEMON_HEADERS :=				\
 	daemon/state_types.h			\
 	daemon/timeout.h			\
 	daemon/wallet.h				\
-	daemon/watch.h                          \
-	daemon/cJSON.h                       
+	daemon/watch.h                      
 	  
 
 daemon/gen_htlc_state_names.h: daemon/htlc_state.h ccan/ccan/cdump/tools/cdump-enumstr
