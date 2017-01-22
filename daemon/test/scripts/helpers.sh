@@ -112,6 +112,10 @@ deadline-blocks=5
 min-htlc-expiry=6
 bitcoin-datadir=$DATADIR
 locktime-blocks=6
+send-to-pulsar
+pulsar-host=localhost
+pulsar-port=8080
+pulsar-topic=/persistent/sample/standalone/ns1/my-topic
 EOF
 
     cp $DIR1/config $DIR2/config
@@ -193,7 +197,7 @@ fund_lightningd()
 {
     # Make a payment into a P2SH for anchor.
     P2SHADDR=`$LCLI1 newaddr | sed -n 's/{ "address" : "\(.*\)" }/\1/p'`
-    FUND_INPUT_TXID=`$CLI sendtoaddress $P2SHADDR 0.01`
+    FUND_INPUT_TXID=`$CLI sendtoaddress $P2SHADDR 2`
     FUND_INPUT_TX=`$CLI getrawtransaction $FUND_INPUT_TXID`
 
     # Mine it so check_tx_spend doesn't see it (breaks some tests).

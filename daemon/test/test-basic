@@ -11,7 +11,7 @@ if [ x"$1" = x"manual-commit" ]; then
     shift
 fi
 
-parse_cmdline 2 "$@" --verbose  #wen
+parse_cmdline 2 "$@"
 setup_lightning 2
 
 if [ -n "$MANUALCOMMIT" ]; then
@@ -53,12 +53,12 @@ B_AMOUNT=0
 B_FEE=0
 check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
-# This is 10,000 satoshi, so not dust!
-HTLC_AMOUNT=10000000
+# This is 0.01 satoshi, so not dust!
+HTLC_AMOUNT=1000000000
 
 EXPIRY=$(( $(blockheight) + 10))
 SECRET=1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd
-RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'` #25fabe82393c5518916a45abe5a8a891915c918e4b7473a29850737b3ebfce98
+RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
 
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 
@@ -134,7 +134,7 @@ A_AMOUNT=$(($A_AMOUNT + $EXTRA_FEE + $HTLC_AMOUNT))
 check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
 # A new one, at 10x the amount.
-HTLC_AMOUNT=100000000
+HTLC_AMOUNT=10000000000
 
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 [ ! -n "$MANUALCOMMIT" ] || lcli1 dev-commit $ID2
@@ -155,7 +155,7 @@ A_FEE=$(($A_FEE - $EXTRA_FEE))
 check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
 # Same again, but this time it expires.
-HTLC_AMOUNT=10000001
+HTLC_AMOUNT=10000000001
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 [ ! -n "$MANUALCOMMIT" ] || lcli1 dev-commit $ID2
 [ ! -n "$MANUALCOMMIT" ] || lcli2 dev-commit $ID1
@@ -187,7 +187,7 @@ check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
 # First, give more money to node2, so it can offer HTLCs.
 EXPIRY=$(( $(blockheight) + 10))
-HTLC_AMOUNT=100000000
+HTLC_AMOUNT=10000000000
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 [ ! -n "$MANUALCOMMIT" ] || lcli1 dev-commit $ID2
 [ ! -n "$MANUALCOMMIT" ] || lcli2 dev-commit $ID1
@@ -202,8 +202,8 @@ lcli2 dev-fulfillhtlc $ID1 $HTLCID $SECRET
 A_FEE=$(($NO_HTLCS_FEE / 2))
 B_FEE=$(($NO_HTLCS_FEE / 2))
 # We transferred 10000000 before, and $HTLC_AMOUNT now.
-A_AMOUNT=$(($AMOUNT - 10000000 - $HTLC_AMOUNT - $A_FEE))
-B_AMOUNT=$((10000000 + $HTLC_AMOUNT - $B_FEE))
+A_AMOUNT=$(($AMOUNT - 10000000000 - $HTLC_AMOUNT - $A_FEE))
+B_AMOUNT=$((10000000000 + $HTLC_AMOUNT - $B_FEE))
 
 check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
@@ -236,7 +236,7 @@ check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
 # Now, two HTLCs at once, one from each direction.
 # Both sides can afford this.
-HTLC_AMOUNT=1000000
+HTLC_AMOUNT=10000000000
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 HTLCID2=`lcli2 dev-newhtlc $ID1 $HTLC_AMOUNT $EXPIRY $RHASH2 | extract_id`
 [ ! -n "$MANUALCOMMIT" ] || lcli2 dev-commit $ID1

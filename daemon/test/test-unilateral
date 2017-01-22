@@ -25,13 +25,13 @@ check_peerstate lcli2 STATE_NORMAL
 # Make sure node2 doesn't fail
 lcli2 dev-routefail false
 
-A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE)) #924280000
-A_FEE=$NO_HTLCS_FEE #67600000
+A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE))
+A_FEE=$NO_HTLCS_FEE
 B_AMOUNT=0
 B_FEE=0
 
-# This is 10,000 satoshi, so not dust!
-HTLC_AMOUNT=10000000
+# This is 0.1 btc, so not dust!
+HTLC_AMOUNT=10000000000
 
 EXPIRY=$(( $(blockheight) + 10))
 SECRET=1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd

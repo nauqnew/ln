@@ -17,7 +17,7 @@ check_tx_spend
 $CLI generate 1
 
 P2SHADDR2=`$LCLI2 newaddr | sed -n 's/{ "address" : "\(.*\)" }/\1/p'`
-TXID2=`$CLI sendtoaddress $P2SHADDR2 0.01`
+TXID2=`$CLI sendtoaddress $P2SHADDR2 2`
 FUND_INPUT_TX2=`$CLI getrawtransaction $TXID2`
 $CLI generate 1
 
@@ -32,7 +32,7 @@ check_peerstate lcli1 STATE_NORMAL
 check_peerstate lcli3 STATE_NORMAL
 
 # More than enough to cover commit fees.
-HTLC_AMOUNT=100000000
+HTLC_AMOUNT=10000000000
 
 # Tell node 1 about the 2->3 route.
 # Add to config in case we are restaring.

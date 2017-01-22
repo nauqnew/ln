@@ -22,13 +22,13 @@ DO_RECONNECT=$RECONNECT
 check_peerstate lcli1 STATE_NORMAL
 check_peerstate lcli2 STATE_NORMAL
 
-A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE)) #924280000
-A_FEE=$NO_HTLCS_FEE #67600000
+A_AMOUNT=$(($AMOUNT - $NO_HTLCS_FEE))
+A_FEE=$NO_HTLCS_FEE
 B_AMOUNT=0
 B_FEE=0
 
 # Send funds to 2 so it can offer HTLCS
-HTLC_AMOUNT=100000000
+HTLC_AMOUNT=10000000000
 RHASH=`lcli2 invoice $HTLC_AMOUNT RHASH3 | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
 ROUTE=`lcli1 getroute $ID2 $HTLC_AMOUNT 1`
 ROUTE=`echo $ROUTE | sed 's/^{ "route" : \(.*\) }$/\1/'`
@@ -47,8 +47,8 @@ lcli2 dev-routefail false
 
 # Set up HTLCs both ways.
 
-# This is 10,000 satoshi, so not dust!
-HTLC_AMOUNT=10000000
+# This is 0.1 btc, so not dust!
+HTLC_AMOUNT=10000000000
 
 EXPIRY=$(( $(blockheight) + 10))
 SECRET=1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd

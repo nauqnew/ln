@@ -18,9 +18,9 @@ PREFIX=$EATMYDATA
 if which valgrind >/dev/null; then :; else NO_VALGRIND=1; fi
 [ -n "$NO_VALGRIND" ] || PREFIX="$EATMYDATA valgrind -q --error-exitcode=7"
 
-# We inject 0.01 bitcoin, but then fees (estimatefee fails and we use a
+# We inject 2 bitcoin, but then fees (estimatefee fails and we use a
 # fee rate as per the default).
-AMOUNT=991880000
+AMOUNT=199991880000
 
 # Default fee rate per kb.
 FEE_RATE=200000

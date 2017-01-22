@@ -12,7 +12,7 @@ setup_lightning 2
 # Simply override default fee (estimatefee fails on regtest anyway)
 DEFAULT_FEE_RATE2=50000
 # We use 5x fee rate for commits, by defailt.
-FEE_RATE2=$(($DEFAULT_FEE_RATE2 * 5))#250000
+FEE_RATE2=$(($DEFAULT_FEE_RATE2 * 5))
 echo "default-fee-rate=$DEFAULT_FEE_RATE2" >> $DIR2/config
 
 start_lightningd 2
@@ -30,13 +30,13 @@ check_peerstate lcli1 STATE_NORMAL
 check_peerstate lcli2 STATE_NORMAL
 
 # Asymmetry, since fee rates different.
-NO_HTLCS_FEE2=$((338 * $FEE_RATE2 / 2000 * 2000)) #84500000
-ONE_HTLCS_FEE2=$(( (338 + 32) * $FEE_RATE2 / 2000 * 2000)) #92500000
+NO_HTLCS_FEE2=$((338 * $FEE_RATE2 / 2000 * 2000)) 
+ONE_HTLCS_FEE2=$(( (338 + 32) * $FEE_RATE2 / 2000 * 2000)) 
 
-A_AMOUNT1=$(($AMOUNT - $NO_HTLCS_FEE)) #924280000
-A_FEE1=$NO_HTLCS_FEE #67600000
-A_AMOUNT2=$(($AMOUNT - $NO_HTLCS_FEE2)) #907380000
-A_FEE2=$NO_HTLCS_FEE2 #84500000
+A_AMOUNT1=$(($AMOUNT - $NO_HTLCS_FEE)) 
+A_FEE1=$NO_HTLCS_FEE 
+A_AMOUNT2=$(($AMOUNT - $NO_HTLCS_FEE2)) 
+A_FEE2=$NO_HTLCS_FEE2 
 B_AMOUNT=0
 B_FEE=0
     
