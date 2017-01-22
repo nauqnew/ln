@@ -28,7 +28,7 @@ B_AMOUNT=0
 B_FEE=0
 check_status $A_AMOUNT $A_FEE "" $B_AMOUNT $B_FEE ""
 
-# 1 btc should cover fees.
+# 0.5 btc should cover fees.
 HTLC_AMOUNT=50000000000
 EXPIRY=$(( $(blockheight) + 10))
 RHASH3=`lcli2 invoice $HTLC_AMOUNT RHASH3 | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
