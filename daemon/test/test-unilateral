@@ -30,8 +30,8 @@ A_FEE=$NO_HTLCS_FEE
 B_AMOUNT=0
 B_FEE=0
 
-# This is 0.1 btc, so not dust!
-HTLC_AMOUNT=10000000000
+# This is 0.5 btc, so not dust!
+HTLC_AMOUNT=50000000000
 
 EXPIRY=$(( $(blockheight) + 10))
 SECRET=1de08917a61cb2b62ed5937d38577f6a7bfe59c176781c6d8128018e8b5ccdfd
@@ -39,8 +39,8 @@ RHASH=`lcli1 dev-rhash $SECRET | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
 
 HTLCID=`lcli1 dev-newhtlc $ID2 $HTLC_AMOUNT $EXPIRY $RHASH | extract_id`
 
-A_AMOUNT=$(($A_AMOUNT - $EXTRA_FEE - $HTLC_AMOUNT)) #907880000
-A_FEE=$(($A_FEE + $EXTRA_FEE)) #74000000
+A_AMOUNT=$(($A_AMOUNT - $EXTRA_FEE - $HTLC_AMOUNT))
+A_FEE=$(($A_FEE + $EXTRA_FEE))
 B_AMOUNT=0
 B_FEE=0
 

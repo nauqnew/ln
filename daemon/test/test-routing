@@ -32,7 +32,7 @@ check_peerstate lcli1 STATE_NORMAL
 check_peerstate lcli3 STATE_NORMAL
 
 # More than enough to cover commit fees.
-HTLC_AMOUNT=10000000000
+HTLC_AMOUNT=50000000000
 
 # Tell node 1 about the 2->3 route.
 # Add to config in case we are restaring.

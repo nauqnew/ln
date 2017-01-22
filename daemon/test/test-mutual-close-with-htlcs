@@ -28,7 +28,7 @@ B_AMOUNT=0
 B_FEE=0
 
 # Send funds to 2 so it can offer HTLCS
-HTLC_AMOUNT=10000000000
+HTLC_AMOUNT=50000000000
 RHASH=`lcli2 invoice $HTLC_AMOUNT RHASH3 | sed 's/.*"\([0-9a-f]*\)".*/\1/'`
 ROUTE=`lcli1 getroute $ID2 $HTLC_AMOUNT 1`
 ROUTE=`echo $ROUTE | sed 's/^{ "route" : \(.*\) }$/\1/'`
