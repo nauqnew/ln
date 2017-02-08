@@ -77,7 +77,8 @@ static int subdaemon(const char *dir, const char *name,
 		goto close_execfail_fail;
 
 	if (childpid == 0) {
-		int fdnum = 4;
+		int fdnum = 3;
+		long max;
 
 		if (reqfd)
 			close(childreq[0]);
@@ -103,6 +104,11 @@ static int subdaemon(const char *dir, const char *name,
 				goto child_errno_fail;
 			fdnum++;
 		}
+
+		/* Make (fairly!) sure all other fds are closed. */
+		max = sysconf(_SC_OPEN_MAX);
+		for (fd = fdnum; fd < max; fd++)
+			close(fd);
 		execl(path_join(NULL, dir, name), name, NULL);
 
 	child_errno_fail:

@@ -19,6 +19,7 @@ DAEMON_LIB_OBJS := $(DAEMON_LIB_SRC:.c=.o)
 
 DAEMON_SRC :=					\
 	daemon/bitcoind.c			\
+	daemon/broadcast.c			\
 	daemon/chaintopology.c			\
 	daemon/channel.c			\
 	daemon/commit_tx.c			\
@@ -28,6 +29,7 @@ DAEMON_SRC :=					\
 	daemon/failure.c			\
 	daemon/feechange.c			\
 	daemon/htlc.c				\
+	daemon/htlc_state.c			\
 	daemon/invoice.c			\
 	daemon/irc_announce.c			\
 	daemon/jsonrpc.c			\
@@ -41,6 +43,7 @@ DAEMON_SRC :=					\
 	daemon/pay.c				\
 	daemon/peer.c				\
 	daemon/routing.c			\
+	daemon/routingrpc.c			\
 	daemon/secrets.c			\
 	daemon/sphinx.c				\
 	daemon/timeout.c			\
@@ -65,6 +68,7 @@ DAEMON_GEN_HEADERS :=				\
 
 DAEMON_HEADERS :=				\
 	daemon/bitcoind.h			\
+	daemon/broadcast.h			\
 	daemon/chaintopology.h			\
 	daemon/channel.h			\
 	daemon/commit_tx.h			\

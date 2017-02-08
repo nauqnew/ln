@@ -49,11 +49,10 @@ static struct lightningd_state *lightningd_state(void)
 	dstate->dev_never_routefail = false;
 	dstate->dev_no_broadcast = false;
 	dstate->bitcoin_req_running = false;
-	dstate->nodes = empty_node_map(dstate);
+	dstate->rstate = new_routing_state(dstate, dstate->base_log);
 	dstate->reexec = NULL;
 	dstate->external_ip = NULL;
 	dstate->announce = NULL;
-	list_head_init(&dstate->broadcast_queue);
 	dstate->invoices = invoices_init(dstate);
 
 	dstate->pulsar_host = NULL;
@@ -87,7 +86,7 @@ int main(int argc, char *argv[])
 
 	/* Set up node ID and private key. */
 	secrets_init(dstate);
-	new_node(dstate, &dstate->id);
+	new_node(dstate->rstate, &dstate->id);
 
 	/* Read or create database. */
 	db_init(dstate);

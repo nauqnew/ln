@@ -24,7 +24,7 @@
 #include <wire/wire.h>
 #include <wire/wire_sync.h>
 
-/* Stdout == status, stdin == requests, 3 == client */
+/* Stdout == status, stdin == requests, 3 == hsmfd */
 #define STATUS_FD STDOUT_FILENO
 #define REQ_FD STDIN_FILENO
 
@@ -400,7 +400,7 @@ static void act_one_responder(struct handshake *h, int fd, struct pubkey *re)
 	 *   * Read _exactly_ `50-bytes` from the network buffer.
 	 *
 	 *   * Parse out the read message (`m`) into `v = m[0]`, `re =
-	 *     m[1:34]` and `c = m[43:]`
+	 *     m[1:33]` and `c = m[34:]`
 	 *     * where `m[0]` is the _first_ byte of `m`, `m[1:33]` are the
 	 *       next `33` bytes of `m` and `m[34:]` is the last 16 bytes of
 	 *       `m`
@@ -611,8 +611,8 @@ static void act_two_initiator(struct handshake *h, int fd, struct pubkey *re)
 	 *
 	 *   * Read _exactly_ `50-bytes` from the network buffer.
 	 *
-	 *   * Parse out the read message (`m`) into `v = m[0]`, `re = m[1:34]`
-	 *     and `c = m[43:]`
+	 *   * Parse out the read message (`m`) into `v = m[0]`, `re = m[1:33]`
+	 *     and `c = m[34:]`
 	 *     * where `m[0]` is the _first_ byte of `m`, `m[1:33]` are the
 	 *       next `33` bytes of `m` and `m[34:]` is the last 16 bytes of
 	 *       `m`
@@ -821,7 +821,7 @@ static void act_three_responder(struct handshake *h, int fd,
 
 	/* BOLT #8:
 	 *
-	 *   * Parse out the read message (`m`) into `v = m[0]`, `c = m[1:50]` and `t = m[50:]`
+	 *   * Parse out the read message (`m`) into `v = m[0]`, `c = m[1:49]` and `t = m[50:]`
 	 */
 
 	/* BOLT #8:
@@ -965,12 +965,12 @@ static void responder(int fd,
 }
 
 #ifndef TESTING
-/* We expect hsmfd as fd 4, then a request then the clientfd */
+/* We expect hsmfd as fd 3, clientfd as 4 */
 int main(int argc, char *argv[])
 {
 	u8 *msg;
 	struct pubkey my_id, their_id;
-	int hsmfd = 4, clientfd;
+	int hsmfd = 3, clientfd = 4;
 	struct secret ck, rk, sk;
 	struct crypto_state *cs;
 
@@ -989,7 +989,6 @@ int main(int argc, char *argv[])
 	msg = wire_sync_read(NULL, REQ_FD);
 	if (!msg)
 		status_failed(WIRE_BAD_COMMAND, "%s", strerror(errno));
-	clientfd = fdpass_recv(REQ_FD);
 	if (clientfd < 0)
 		status_failed(WIRE_BAD_FDPASS, "%s", strerror(errno));
 

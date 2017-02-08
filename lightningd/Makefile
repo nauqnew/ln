@@ -9,6 +9,7 @@ lightningd-all: lightningd/lightningd lightningd/lightningd_hsm lightningd/light
 default: lightningd-all
 
 LIGHTNINGD_OLD_SRC :=				\
+	daemon/broadcast.c			\
 	daemon/configdir.c			\
 	daemon/dns.c				\
 	daemon/netaddr.c			\
@@ -25,8 +26,18 @@ LIGHTNINGD_OLD_SRC :=				\
 LIGHTNINGD_OLD_OBJS := $(LIGHTNINGD_OLD_SRC:.c=.o)
 LIGHTNINGD_OLD_HEADERS := $(LIGHTNINGD_OLD_SRC:.c=.h)
 
+LIGHTNINGD_OLD_LIB_SRC :=			\
+	daemon/htlc_state.c
+LIGHTNINGD_OLD_LIB_OBJS := $(LIGHTNINGD_OLD_LIB_SRC:.c=.o)
+LIGHTNINGD_OLD_LIB_HEADERS := $(LIGHTNINGD_OLD_LIB_SRC:.c=.h)
+
 LIGHTNINGD_LIB_SRC :=				\
-	lightningd/cryptomsg.c
+	lightningd/channel_config.c		\
+	lightningd/commit_tx.c			\
+	lightningd/cryptomsg.c			\
+	lightningd/funding_tx.c			\
+	lightningd/htlc_tx.c			\
+	lightningd/key_derive.c
 
 LIGHTNINGD_LIB_OBJS := $(LIGHTNINGD_LIB_SRC:.c=.o)
 LIGHTNINGD_LIB_HEADERS := $(LIGHTNINGD_LIB_SRC:.c=.h)
@@ -50,10 +61,12 @@ LIGHTNINGD_HEADERS_NOGEN =			\
 	lightningd/lightningd.h			\
 	lightningd/peer_control.h		\
 	lightningd/subdaemon.h			\
+	$(LIGHTNINGD_OLD_LIB_HEADERS)		\
 	$(LIGHTNINGD_LIB_HEADERS)		\
 	$(WIRE_HEADERS)				\
 	$(BITCOIN_HEADERS)			\
 	$(CORE_HEADERS)				\
+	$(CORE_TX_HEADERS)			\
 	$(DAEMON_HEADERS)
 
 # Generated headers
@@ -91,7 +104,7 @@ check-makefile: check-lightningd-makefile
 check-lightningd-makefile:
 	@for f in lightningd/*.h lightningd/*/*.h; do if ! echo $(LIGHTNINGD_HEADERS_NOGEN) $(LIGHTNINGD_HEADERS_GEN) "" | grep -q "$$f "; then echo $$f not mentioned in LIGHTNINGD_HEADERS_NOGEN or LIGHTNINGD_HEADERS_GEN >&2; exit 1; fi; done
 
-lightningd/lightningd: $(LIGHTNINGD_OBJS) $(LIGHTNINGD_OLD_OBJS) $(LIGHTNINGD_LIB_OBJS) $(LIGHTNINGD_JSMN_OBJS) $(CORE_OBJS) $(BITCOIN_OBJS) $(WIRE_OBJS) $(CCAN_OBJS) $(LIGHTNINGD_HSM_CONTROL_OBJS) $(LIGHTNINGD_HANDSHAKE_CONTROL_OBJS) $(LIGHTNINGD_GOSSIP_CONTROL_OBJS) $(LIBBASE58_OBJS) libsecp256k1.a libsodium.a
+lightningd/lightningd: $(LIGHTNINGD_OBJS) $(LIGHTNINGD_OLD_OBJS) $(LIGHTNINGD_OLD_LIB_OBJS) $(LIGHTNINGD_LIB_OBJS) $(LIGHTNINGD_JSMN_OBJS) $(CORE_OBJS) $(CORE_TX_OBJS) $(BITCOIN_OBJS) $(WIRE_OBJS) $(CCAN_OBJS) $(LIGHTNINGD_HSM_CONTROL_OBJS) $(LIGHTNINGD_HANDSHAKE_CONTROL_OBJS) $(LIGHTNINGD_GOSSIP_CONTROL_OBJS) $(LIBBASE58_OBJS) libsecp256k1.a libsodium.a
 
 clean: lightningd-clean
 

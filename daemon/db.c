@@ -163,28 +163,26 @@ static void sha256_from_sql(sqlite3_stmt *stmt, int idx, struct sha256 *sha)
 }
 
 static void sig_from_sql(sqlite3_stmt *stmt, int idx,
-			 struct bitcoin_signature *sig)
+			 secp256k1_ecdsa_signature *sig)
 {
 	u8 compact[64];
 
 	from_sql_blob(stmt, idx, compact, sizeof(compact));
-	if (secp256k1_ecdsa_signature_parse_compact(secp256k1_ctx, &sig->sig.sig,
+	if (secp256k1_ecdsa_signature_parse_compact(secp256k1_ctx, sig,
 						    compact) != 1)
 		fatal("db:bad signature blob");
-	sig->stype = SIGHASH_ALL;
 }
 
 static char *sig_to_sql(const tal_t *ctx,
-			const struct bitcoin_signature *sig)
+			const secp256k1_ecdsa_signature *sig)
 {
 	u8 compact[64];
 
 	if (!sig)
 		return sql_hex_or_null(ctx, NULL, 0);
 
-	assert(sig->stype == SIGHASH_ALL);
 	secp256k1_ecdsa_signature_serialize_compact(secp256k1_ctx, compact,
-						    &sig->sig.sig);
+						    sig);
 	return sql_hex_or_null(ctx, compact, sizeof(compact));
 }
 
@@ -473,7 +471,7 @@ static void load_peer_commit_info(struct peer *peer)
 		if (sqlite3_column_type(stmt, 5) == SQLITE_NULL)
 			ci->sig = NULL;
 		else {
-			ci->sig = tal(ci, struct bitcoin_signature);
+			ci->sig = tal(ci, secp256k1_ecdsa_signature);
 			sig_from_sql(stmt, 5, ci->sig);
 		}
 
@@ -580,7 +578,7 @@ static void load_peer_htlcs(struct peer *peer)
 				     hstate);
 
 		if (sqlite3_column_type(stmt, 6) != SQLITE_NULL) {
-			htlc->r = tal(htlc, struct rval);
+			htlc->r = tal(htlc, struct preimage);
 			from_sql_blob(stmt, 6, htlc->r, sizeof(*htlc->r));
 		}
 		if (sqlite3_column_type(stmt, 10) != SQLITE_NULL) {
@@ -881,7 +879,7 @@ static void load_peer_closing(struct peer *peer)
 			peer->closing.their_sig = NULL;
 		else {
 			peer->closing.their_sig = tal(peer,
-						      struct bitcoin_signature);
+						      secp256k1_ecdsa_signature);
 			sig_from_sql(stmt, 3, peer->closing.their_sig);
 		}
 		peer->closing.our_script = tal_sql_blob(peer, stmt, 4);
@@ -915,7 +913,7 @@ static void restore_peer_local_visible_state(struct peer *peer)
 				 &peer->local.next_revocation_hash);
 
 	if (state_is_normal(peer->state))
-		peer->nc = add_connection(peer->dstate,
+		peer->nc = add_connection(peer->dstate->rstate,
 					  &peer->dstate->id, peer->id,
 					  peer->dstate->config.fee_base,
 					  peer->dstate->config.fee_per_satoshi,
@@ -1053,7 +1051,7 @@ static void db_load_pay(struct lightningd_state *dstate)
 		struct pubkey *peer_id;
 		u64 htlc_id, msatoshi;
 		struct pubkey *ids;
-		struct rval *r;
+		struct preimage *r;
 		void *fail;
 
 		if (err != SQLITE_ROW)
@@ -1079,7 +1077,7 @@ static void db_load_pay(struct lightningd_state *dstate)
 		if (sqlite3_column_type(stmt, 5) == SQLITE_NULL)
 			r = NULL;
 		else {
-			r = tal(ctx, struct rval);
+			r = tal(ctx, struct preimage);
 			from_sql_blob(stmt, 5, r, sizeof(*r));
 		}
 		fail = tal_sql_blob(ctx, stmt, 6);
@@ -1118,7 +1116,7 @@ static void db_load_invoice(struct lightningd_state *dstate)
 		      sqlite3_errstr(err), sqlite3_errmsg(dstate->db->sql));
 
 	while ((err = sqlite3_step(stmt)) != SQLITE_DONE) {
-		struct rval r;
+		struct preimage r;
 		u64 msatoshi, paid_num;
 		const char *label;
 
@@ -2312,7 +2310,7 @@ void db_complete_pay_command(struct lightningd_state *dstate,
 bool db_new_invoice(struct lightningd_state *dstate,
 		    u64 msatoshi,
 		    const char *label,
-		    const struct rval *r)
+		    const struct preimage *r)
 {
 	const tal_t *ctx = tal_tmpctx(dstate);
 	bool ok;
