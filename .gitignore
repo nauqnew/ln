@@ -13,6 +13,8 @@ libsecp256k1.a
 libsecp256k1.la
 libsodium.a
 libsodium.la
+libwally-core.a
+libwally-core.la
 gen_*
 daemon/lightning-cli
 check-bolt
@@ -23,6 +25,9 @@ ccan/config.h
 lightningd/lightningd_gossip
 lightningd/lightningd_handshake
 lightningd/test/run-cryptomsg
+lightningd/test/run-commit_tx
+lightningd/test/run-funding_tx
+lightningd/test/run-key_derive
 wire/test/run-peer-wire
 bitcoin/test/run-tx-encode
 daemon/test/run-maxfee

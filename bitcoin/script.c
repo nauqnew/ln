@@ -281,6 +281,21 @@ void bitcoin_witness_p2sh_p2wpkh(const tal_t *ctx,
 	input->witness[1] = stack_key(input->witness, key);
 }
 
+u8 **bitcoin_witness_p2wpkh(const tal_t *ctx,
+			    const secp256k1_ecdsa_signature *sig,
+			    const struct pubkey *key)
+{
+	u8 **witness;
+
+	/* BIP141: The witness must consist of exactly 2 items (≤ 520
+	 * bytes each). The first one a signature, and the second one
+	 * a public key. */
+	witness = tal_arr(ctx, u8 *, 2);
+	witness[0] = stack_sig(witness, sig);
+	witness[1] = stack_key(witness, key);
+	return witness;
+}
+
 /* Create an output script for a 32-byte witness. */
 u8 *scriptpubkey_p2wsh(const tal_t *ctx, const u8 *witnessscript)
 {
@@ -303,6 +318,17 @@ u8 *scriptpubkey_p2wpkh(const tal_t *ctx, const struct pubkey *key)
 	add_op(&script, OP_0);
 	pubkey_to_der(der, key);
 	hash160(&h, der, sizeof(der));
+	add_push_bytes(&script, &h, sizeof(h));
+	return script;
+}
+
+u8 *scriptpubkey_p2wpkh_derkey(const tal_t *ctx, const u8 der[33])
+{
+	u8 *script = tal_arr(ctx, u8, 0);
+	struct ripemd160 h;
+
+	add_op(&script, OP_0);
+	hash160(&h, der, PUBKEY_DER_LEN);
 	add_push_bytes(&script, &h, sizeof(h));
 	return script;
 }

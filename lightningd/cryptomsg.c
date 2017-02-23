@@ -12,23 +12,6 @@
 #include <wire/wire.h>
 #include <wire/wire_io.h>
 
-struct crypto_state {
-	/* Received and sent nonces. */
-	u64 rn, sn;
-	/* Sending and receiving keys. */
-	struct sha256 sk, rk;
-	/* Chaining key for re-keying */
-	struct sha256 s_ck, r_ck;
-
-	/* Peer who owns us: peer->crypto_state == this */
-	struct peer *peer;
-
-	/* Output and input buffers. */
-	u8 *out, *in;
-	struct io_plan *(*next_in)(struct io_conn *, struct peer *, u8 *);
-	struct io_plan *(*next_out)(struct io_conn *, struct peer *);
-};
-
 static void hkdf_two_keys(struct sha256 *out1, struct sha256 *out2,
 			  const struct sha256 *in1,
 			  const struct sha256 *in2)
@@ -102,13 +85,17 @@ static void le64_nonce(unsigned char *npub, u64 nonce)
 	memcpy(npub + zerolen, &le_nonce, sizeof(le_nonce));
 }
 
-static struct io_plan *peer_decrypt_body(struct io_conn *conn,
-					 struct crypto_state *cs)
+u8 *cryptomsg_decrypt_body(const tal_t *ctx,
+			   struct crypto_state *cs, const u8 *in)
 {
 	unsigned char npub[crypto_aead_chacha20poly1305_ietf_NPUBBYTES];
 	unsigned long long mlen;
-	u8 *decrypted = tal_arr(cs->in, u8, tal_count(cs->in) - 16), *in;
-	struct io_plan *plan;
+	size_t inlen = tal_count(in);
+	u8 *decrypted;
+
+	if (inlen < 16)
+		return NULL;
+	decrypted = tal_arr(ctx, u8, inlen - 16);
 
 	le64_nonce(npub, cs->rn++);
 
@@ -121,17 +108,28 @@ static struct io_plan *peer_decrypt_body(struct io_conn *conn,
 	 */
 	if (crypto_aead_chacha20poly1305_ietf_decrypt(decrypted,
 						      &mlen, NULL,
-						      memcheck(cs->in,
-							       tal_count(cs->in)),
-						      tal_count(cs->in),
+						      memcheck(in, inlen),
+						      inlen,
 						      NULL, 0,
 						      npub, cs->rk.u.u8) != 0) {
 		/* FIXME: Report error! */
-		return io_close(conn);
+		return tal_free(decrypted);
 	}
 	assert(mlen == tal_count(decrypted));
 
 	maybe_rotate_key(&cs->rn, &cs->rk, &cs->r_ck);
+	return decrypted;
+}
+
+static struct io_plan *peer_decrypt_body(struct io_conn *conn,
+					 struct crypto_state *cs)
+{
+	struct io_plan *plan;
+	u8 *in, *decrypted;
+
+	decrypted = cryptomsg_decrypt_body(cs->in, cs, cs->in);
+	if (!decrypted)
+		return io_close(conn);
 
 	/* Steal cs->in: we free it after, and decrypted too unless
 	 * they steal but be careful not to touch anything after
@@ -144,8 +142,7 @@ static struct io_plan *peer_decrypt_body(struct io_conn *conn,
 	return plan;
 }
 
-static struct io_plan *peer_decrypt_header(struct io_conn *conn,
-					   struct crypto_state *cs)
+bool cryptomsg_decrypt_header(struct crypto_state *cs, u8 *hdr, u16 *lenp)
 {
 	unsigned char npub[crypto_aead_chacha20poly1305_ietf_NPUBBYTES];
 	unsigned long long mlen;
@@ -165,15 +162,27 @@ static struct io_plan *peer_decrypt_header(struct io_conn *conn,
 	 */
 	if (crypto_aead_chacha20poly1305_ietf_decrypt((unsigned char *)&len,
 						      &mlen, NULL,
-						      memcheck(cs->in,
-							       tal_count(cs->in)),
-						      tal_count(cs->in),
+						      memcheck(hdr,
+							       tal_count(hdr)),
+						      tal_count(hdr),
 						      NULL, 0,
 						      npub, cs->rk.u.u8) != 0) {
 		/* FIXME: Report error! */
-		return io_close(conn);
+		return false;
 	}
 	assert(mlen == sizeof(len));
+	*lenp = be16_to_cpu(len);
+	return true;
+}
+
+static struct io_plan *peer_decrypt_header(struct io_conn *conn,
+					   struct crypto_state *cs)
+{
+	u16 len;
+
+	if (!cryptomsg_decrypt_header(cs, cs->in, &len))
+		return io_close(conn);
+
 	tal_free(cs->in);
 
 	/* BOLT #8:
@@ -181,7 +190,7 @@ static struct io_plan *peer_decrypt_header(struct io_conn *conn,
 	 * * Read _exactly_ `l+16` bytes from the network buffer, let
 	 *   the bytes be known as `c`.
 	 */
-	cs->in = tal_arr(cs, u8, (u32)be16_to_cpu(len) + 16);
+	cs->in = tal_arr(cs, u8, (u32)len + 16);
 	return io_read(conn, cs->in, tal_count(cs->in), peer_decrypt_body, cs);
 }
 
@@ -213,21 +222,17 @@ static struct io_plan *peer_write_done(struct io_conn *conn,
 	return cs->next_out(conn, cs->peer);
 }
 
-struct io_plan *peer_write_message(struct io_conn *conn,
-				   struct crypto_state *cs,
-				   const u8 *msg,
-				   struct io_plan *(*next)(struct io_conn *,
-							   struct peer *))
+u8 *cryptomsg_encrypt_msg(const tal_t *ctx,
+			  struct crypto_state *cs,
+			  const u8 *msg)
 {
 	unsigned char npub[crypto_aead_chacha20poly1305_ietf_NPUBBYTES];
 	unsigned long long clen, mlen = tal_count(msg);
 	be16 l;
 	int ret;
+	u8 *out;
 
-	assert(!cs->out);
-
-	cs->out = tal_arr(cs, u8, sizeof(l) + 16 + mlen + 16);
-	cs->next_out = next;
+	out = tal_arr(cs, u8, sizeof(l) + 16 + mlen + 16);
 
 	/* BOLT #8:
 	 *
@@ -246,12 +251,14 @@ struct io_plan *peer_write_message(struct io_conn *conn,
 	 *
 	 *   * Encrypt `l` using `ChaChaPoly-1305`, `sn`, and `sk` to obtain `lc`
 	 *     (`18-bytes`)
-	 *     * The nonce `sn` is encoded as a 96-bit big-endian number.
+	 *     * The nonce `sn` is encoded as a 96-bit little-endian number.
+	 *      As our decoded nonces a 64-bit, we encode the 96-bit nonce as
+	 *      follows: 32-bits of leading zeroes followed by a 64-bit value.
 	 * 	* The nonce `sn` MUST be incremented after this step.
 	 *     * A zero-length byte slice is to be passed as the AD
 	 */
 	le64_nonce(npub, cs->sn++);
-	ret = crypto_aead_chacha20poly1305_ietf_encrypt(cs->out, &clen,
+	ret = crypto_aead_chacha20poly1305_ietf_encrypt(out, &clen,
 							(unsigned char *)
 							memcheck(&l, sizeof(l)),
 							sizeof(l),
@@ -265,7 +272,7 @@ struct io_plan *peer_write_message(struct io_conn *conn,
 		     tal_hexstr(trc, &l, sizeof(l)),
 		     tal_hexstr(trc, npub, sizeof(npub)),
 		     tal_hexstr(trc, &cs->sk, sizeof(cs->sk)),
-		     tal_hexstr(trc, cs->out, clen));
+		     tal_hexstr(trc, out, clen));
 #endif
 
 	/* BOLT #8:
@@ -277,7 +284,7 @@ struct io_plan *peer_write_message(struct io_conn *conn,
 	 *     * The nonce `sn` MUST be incremented after this step.
 	 */
 	le64_nonce(npub, cs->sn++);
-	ret = crypto_aead_chacha20poly1305_ietf_encrypt(cs->out + clen, &clen,
+	ret = crypto_aead_chacha20poly1305_ietf_encrypt(out + clen, &clen,
 							memcheck(msg, mlen),
 							mlen,
 							NULL, 0,
@@ -290,10 +297,24 @@ struct io_plan *peer_write_message(struct io_conn *conn,
 		     tal_hexstr(trc, msg, mlen),
 		     tal_hexstr(trc, npub, sizeof(npub)),
 		     tal_hexstr(trc, &cs->sk, sizeof(cs->sk)),
-		     tal_hexstr(trc, cs->out + 18, clen));
+		     tal_hexstr(trc, out + 18, clen));
 #endif
 
 	maybe_rotate_key(&cs->sn, &cs->sk, &cs->s_ck);
+
+	return out;
+}
+
+struct io_plan *peer_write_message(struct io_conn *conn,
+				   struct crypto_state *cs,
+				   const u8 *msg,
+				   struct io_plan *(*next)(struct io_conn *,
+							   struct peer *))
+{
+	assert(!cs->out);
+
+	cs->out = cryptomsg_encrypt_msg(cs, cs, msg);
+	cs->next_out = next;
 
 	/* BOLT #8:
 	 *   * Send `lc || c` over the network buffer.
@@ -332,20 +353,12 @@ void towire_crypto_state(u8 **ptr, const struct crypto_state *cs)
 	towire_sha256(ptr, &cs->r_ck);
 }
 
-struct crypto_state *fromwire_crypto_state(const tal_t *ctx,
-					   const u8 **ptr, size_t *max)
+void fromwire_crypto_state(const u8 **ptr, size_t *max, struct crypto_state *cs)
 {
-	struct crypto_state *cs = tal(ctx, struct crypto_state);
-
 	cs->rn = fromwire_u64(ptr, max);
 	cs->sn = fromwire_u64(ptr, max);
 	fromwire_sha256(ptr, max, &cs->sk);
 	fromwire_sha256(ptr, max, &cs->rk);
 	fromwire_sha256(ptr, max, &cs->s_ck);
 	fromwire_sha256(ptr, max, &cs->r_ck);
-	cs->peer = (struct peer *)ctx;
-
-	if (!*ptr)
-		return tal_free(cs);
-	return cs;
 }

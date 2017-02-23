@@ -11,9 +11,11 @@
 #include <ccan/tal/str/str.h>
 #include <daemon/broadcast.h>
 #include <daemon/routing.h>
+#include <daemon/timeout.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <lightningd/cryptomsg.h>
 #include <lightningd/gossip/gen_gossip_control_wire.h>
 #include <lightningd/gossip/gen_gossip_status_wire.h>
 #include <secp256k1_ecdh.h>
@@ -34,6 +36,8 @@ struct daemon {
 
 	/* Routing information */
 	struct routing_state *rstate;
+
+	struct timers timers;
 };
 
 struct peer {
@@ -55,6 +59,9 @@ struct peer {
 
 	/* High water mark for the staggered broadcast */
 	u64 broadcast_index;
+	u8 **msg_out;
+	/* Is it time to continue the staggered broadcast? */
+	bool gossip_sync;
 };
 
 static void destroy_peer(struct peer *peer)
@@ -69,11 +76,13 @@ static void destroy_peer(struct peer *peer)
 static struct peer *setup_new_peer(struct daemon *daemon, const u8 *msg)
 {
 	struct peer *peer = tal(daemon, struct peer);
-	if (!fromwire_gossipctl_new_peer(peer, msg, NULL,
-					 &peer->unique_id, &peer->cs))
+	peer->cs = tal(peer, struct crypto_state);
+	if (!fromwire_gossipctl_new_peer(msg, NULL, &peer->unique_id, peer->cs))
 		return tal_free(peer);
+	peer->cs->peer = peer;
 	peer->daemon = daemon;
 	peer->error = NULL;
+	peer->msg_out = tal_arr(peer, u8*, 0);
 	list_add_tail(&daemon->peers, &peer->list);
 	tal_add_destructor(peer, destroy_peer);
 	return peer;
@@ -149,6 +158,17 @@ static struct io_plan *peer_msgin(struct io_conn *conn,
  * queued gossip messages and processes them. */
 static struct io_plan *pkt_out(struct io_conn *conn, struct peer *peer);
 
+/* Wake up the outgoing direction of the connection and write any
+ * queued messages. Needed since the `io_wake` method signature does
+ * not allow us to specify it as the callback for `new_reltimer`, but
+ * it allows us to set an additional flag for the routing dump..
+ */
+static void wake_pkt_out(struct peer *peer)
+{
+	peer->gossip_sync = true;
+	io_wake(peer);
+}
+
 /* Loop through the backlog of channel_{announcements,updates} and
  * node_announcements, writing out one on each iteration. Once we are
  * through wait for the broadcast interval and start again. */
@@ -159,7 +179,8 @@ static struct io_plan *peer_dump_gossip(struct io_conn *conn, struct peer *peer)
 		peer->daemon->rstate->broadcasts, &peer->broadcast_index);
 
 	if (!next) {
-		//FIXME(cdecker) Add wakeup timer once timers are refactored.
+		new_reltimer(&peer->daemon->timers, peer, time_from_sec(30), wake_pkt_out, peer);
+		/* Going to wake up in pkt_out since we mix time based and message based wakeups */
 		return io_out_wait(conn, peer, pkt_out, peer);
 	} else {
 		return peer_write_message(conn, peer->cs, next->payload, peer_dump_gossip);
@@ -168,9 +189,23 @@ static struct io_plan *peer_dump_gossip(struct io_conn *conn, struct peer *peer)
 
 static struct io_plan *pkt_out(struct io_conn *conn, struct peer *peer)
 {
-	//FIXME(cdecker) Add logic to enable sending of non-broadcast messages
-	/* Send any queued up messages */
-	return peer_dump_gossip(conn, peer);
+	/* First we process queued packets, if any */
+	u8 *out;
+	size_t n = tal_count(peer->msg_out);
+	if (n > 0) {
+		out = peer->msg_out[0];
+		memmove(peer->msg_out, peer->msg_out + 1, (sizeof(*peer->msg_out)*(n-1)));
+		tal_resize(&peer->msg_out, n-1);
+		return peer_write_message(conn, peer->cs, out, pkt_out);
+	}
+
+	if (peer->gossip_sync){
+		/* Send any queued up broadcast messages */
+		peer->gossip_sync = false;
+		return peer_dump_gossip(conn, peer);
+	} else {
+		return io_out_wait(conn, peer, pkt_out, peer);
+	}
 }
 
 static bool has_even_bit(const u8 *bitmap)
@@ -353,13 +388,24 @@ int main(int argc, char *argv[])
 	daemon = tal(NULL, struct daemon);
 	daemon->rstate = new_routing_state(daemon, NULL);
 	list_head_init(&daemon->peers);
+	timers_init(&daemon->timers, time_mono());
 	daemon->msg_in = NULL;
 
 	/* Stdout == status, stdin == requests */
 	status_setup(STDOUT_FILENO);
 
 	io_new_conn(NULL, STDIN_FILENO, next_req_in, daemon);
-	io_loop(NULL, NULL);
+
+	for (;;) {
+		struct timer *expired = NULL;
+		io_loop(&daemon->timers, &expired);
+
+		if (!expired) {
+			break;
+		} else {
+			timer_expired(daemon, expired);
+		}
+	}
 
 	tal_free(daemon);
 	return 0;
