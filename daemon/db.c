@@ -1363,8 +1363,8 @@ void db_set_anchor(struct peer *peer)
 	peerid = pubkey_to_hexstr(ctx, peer->id);
 	log_debug(peer->log, "%s(%s)", __func__, peerid);
 	
-    if(peer->dstate->dosend)
-	{
+ //    if(peer->dstate->dosend)
+	// {
         struct json_result * data = new_json_result(NULL);
         json_object_start(data,NULL);
 
@@ -1373,37 +1373,43 @@ void db_set_anchor(struct peer *peer)
         json_add_string(data, "txid", tal_hexstr(ctx, &peer->anchor.txid, sizeof(peer->anchor.txid)));
         json_add_num(data, "index", peer->anchor.index);
         json_add_u64(data, "satoshis", peer->anchor.satoshis);
-        json_add_num(data, "ok_depth", peer->anchor.ok_depth);
+        json_add_int(data, "ok_depth", peer->anchor.ok_depth);
         json_add_num(data, "min_depth", peer->anchor.min_depth);
         json_add_bool(data, "ours", peer->anchor.ours);
         json_object_end(data);
-
-        json_array_start(data, "commit_info");
-
-        json_object_start(data,"local_commit");
-        json_add_string(data, "peerid", peerid);
-        json_add_string(data, "side", side_to_str(LOCAL));
-        json_add_string(data, "revocation_hash", tal_hexstr(ctx, &peer->local.commit->revocation_hash,
-                                                            sizeof(peer->local.commit->revocation_hash)));
-        json_add_u64(data,"order",peer->local.commit->order);
-        json_add_string(data,"sig",sig_to_sql(ctx, peer->local.commit->sig));
-        json_object_end(data);
-
-        json_object_start(data,"remote_commit");
-        json_add_string(data, "peerid", peerid);
-        json_add_string(data, "side", side_to_str(REMOTE));
-        json_add_string(data, "revocation_hash", tal_hexstr(ctx, &peer->remote.commit->revocation_hash,
-                                                            sizeof(peer->remote.commit->revocation_hash)));
-        json_add_u64(data,"order",peer->remote.commit->order);
-        json_add_string(data,"sig",sig_to_sql(ctx, peer->remote.commit->sig));
-        json_object_end(data);
-
-        json_array_end(data);
         json_object_end(data);
 
         send_to_pulsar(json_result_string(data), peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);
         tal_free(data);
-    }
+
+        struct json_result * commit_info = new_json_result(NULL);
+        json_object_start(commit_info,NULL);
+        json_array_start(commit_info, "commit_info");
+
+        json_object_start(commit_info,"local_commit");
+        json_add_string(commit_info, "peerid", peerid);
+        json_add_string(commit_info, "side", side_to_str(LOCAL));
+        json_add_string(commit_info, "revocation_hash", tal_hexstr(ctx, &peer->local.commit->revocation_hash,
+                                                            sizeof(peer->local.commit->revocation_hash)));
+        json_add_u64(commit_info,"order",peer->local.commit->order);
+        json_add_string(commit_info,"sig",sig_to_sql(ctx, peer->local.commit->sig));
+        json_object_end(commit_info);
+
+        json_object_start(commit_info,"remote_commit");
+        json_add_string(commit_info, "peerid", peerid);
+        json_add_string(commit_info, "side", side_to_str(REMOTE));
+        json_add_string(commit_info, "revocation_hash", tal_hexstr(ctx, &peer->remote.commit->revocation_hash,
+                                                            sizeof(peer->remote.commit->revocation_hash)));
+        json_add_u64(commit_info,"order",peer->remote.commit->order);
+        json_add_string(commit_info,"sig",sig_to_sql(ctx, peer->remote.commit->sig));
+        json_object_end(commit_info);
+
+        json_array_end(commit_info);
+        json_object_end(commit_info);
+
+        send_to_pulsar(json_result_string(commit_info), peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);
+        tal_free(commit_info);
+    // }
 	
 	db_exec(__func__, peer->dstate,
 		"INSERT INTO anchors VALUES (x'%s', x'%s', %u, %"PRIu64", %i, %u, %s);",
@@ -1536,22 +1542,26 @@ void db_create_peer(struct peer *peer)
         json_add_u64(data, "fee_rate", peer->local.commit_fee_rate);
         json_object_end(data);
 
-        if (peer->local.offer_anchor)
-        {
-            json_object_start(data,"anchor_inputs");
-            json_add_string(data, "txid", tal_hexstr(ctx, &peer->anchor.input->txid,
-                                                     sizeof(peer->anchor.input->txid)));
-            json_add_num(data, "index", peer->anchor.input->index);
-            json_add_u64(data, "in_amount", peer->anchor.input->in_amount);
-            json_add_u64(data, "out_amount", peer->anchor.input->out_amount);
-            json_add_string(data, "walletkey", pubkey_to_hexstr(ctx, &peer->anchor.input->walletkey));
-            json_object_end(data);
-
-        }
-
         json_object_end(data);
         send_to_pulsar(json_result_string(data), peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);  //send to the queue.
         tal_free(data);
+
+        if (peer->local.offer_anchor)
+        {
+        	struct json_result * anchor_inputs = new_json_result(NULL);
+            json_object_start(anchor_inputs,"anchor_inputs");
+            json_add_string(anchor_inputs, "txid", tal_hexstr(ctx, &peer->anchor.input->txid,
+                                                     sizeof(peer->anchor.input->txid)));
+            json_add_num(anchor_inputs, "index", peer->anchor.input->index);
+            json_add_u64(anchor_inputs, "in_amount", peer->anchor.input->in_amount);
+            json_add_u64(anchor_inputs, "out_amount", peer->anchor.input->out_amount);
+            json_add_string(anchor_inputs, "walletkey", pubkey_to_hexstr(ctx, &peer->anchor.input->walletkey));
+            json_object_end(anchor_inputs);
+
+            send_to_pulsar(json_result_string(anchor_inputs), peer->dstate->pulsar_host, peer->dstate->pulsar_port, peer->dstate->topic);  //send to the queue.
+        	tal_free(anchor_inputs);
+
+        }
 
     }
 

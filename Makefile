@@ -211,11 +211,8 @@ PROGRAMS := $(TEST_PROGRAMS)
 
 CWARNFLAGS := -Werror -Wall -Wundef -Wmissing-prototypes -Wmissing-declarations -Wstrict-prototypes -Wold-style-definition
 CDEBUGFLAGS := -g -fstack-protector
-<<<<<<< HEAD
-CFLAGS := $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) -I secp256k1/include/ -I libsodium/src/libsodium/include/ -I . $(FEATURES) $(COVFLAGS) -fPIC
-=======
+
 CFLAGS := $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) -I libwally-core/src/secp256k1/include/ -I libwally-core/include/ -I libsodium/src/libsodium/include/ -I . $(FEATURES) $(COVFLAGS)
->>>>>>> upstream/master
 
 LDLIBS := -lprotobuf-c -lgmp -lsqlite3 $(COVFLAGS)  -L /usr/lib -lpul -lboost_thread -lboost_system -lm
 $(PROGRAMS): CFLAGS+=-I.
